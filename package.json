@@ -1,7 +1,7 @@
 {
   "name": "expo-sqlite-wrapper",
   "version": "1.0.0",
-  "description": "This is a wrapper for expo-sqlite, as it make it very easy to create,update and work with the database file",
+  "description": "This is a wrapper for `expo-sqlite` as it make it very easy to create, update and work with the database file",
   "main": "index.tsx",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -13,7 +13,15 @@
     "expo",
     "expo-sqlite-qrapper"
   ],
-  "author": "Alen Toma",
+  "repository": "https://github.com/AlenToma/expo-sqlite-wrapper",
+  "author": "Alen Toma <alen.toma@gmail.com> (https://github.com/AlenToma)",
+  "bugs": {
+    "url": "https://github.com/AlenToma/expo-sqlite-wrapper/issues"
+  },
+  "homepage": "https://github.com/AlenToma/expo-sqlite-wrapper#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "license": "MIT",
   "dependencies": {
     "expo-sqlite": "^9.2.1"
