@@ -21,7 +21,7 @@ export interface IChildQueryLoader<T, B, D extends string> {
 }
 
 export interface IWatcher<T, D extends string> {
-    onSave?: (item: T[]) => Promise<boolean | undefined>;
+    onSave?: (item: T[]) => Promise<void>;
     onDelete?: (item: T[]) => Promise<void>;
     readonly removeWatch: () => void;
 }

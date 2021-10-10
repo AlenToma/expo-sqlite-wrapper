@@ -9,7 +9,7 @@ export default function <D extends string>(databaseTables: TablaStructor<D>[], g
 
 class Watcher<T, D extends string> implements IWatcher<T, D> {
     tableName: D;
-    onSave?: (item: T[]) => Promise<boolean>;
+    onSave?: (item: T[]) => Promise<void>;
     onDelete?: (item: T[]) => Promise<void>;
     readonly removeWatch: () => void;
     constructor(tableName: D) {
