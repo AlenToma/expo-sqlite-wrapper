@@ -112,7 +112,10 @@ const addItem= async ()=> {
    // this will be converted to [Select * from Parents where (name in (?,?)) OR (email = ?)] WHERE ? is the arguments.
    // Also make note that if arguments in IN() is empty or undefined the select Sats will remove the select for the column Name
    // and the select will be [Select * from Parents where (email like %?%)] the same for EqualTo etc..
-    var item = await dbContext.database.query<Parent>("Parents").Start().Column(x=> x.name).IN(["name", "testName"]).End().OR()
+   
+    var item = await dbContext.database.query<Parent>("Parents")
+     .Start().Column(x=> x.name).IN(["name", "testName"]).End()
+     .OR()
      .Start().Column(x=> x.email).Contains("test@").End()
      .LoadChildren("Childrens", x=> x.id)
      .With<Child>(x=> x.parentId)
