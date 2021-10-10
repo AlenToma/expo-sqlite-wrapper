@@ -1,0 +1,21 @@
+{
+  "name": "expo-sqlite-wrapper",
+  "version": "1.0.0",
+  "description": "This is a wrapper for expo-sqlite, as it make it very easy to create,update and work with the database file",
+  "main": "index.tsx",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "expo-sqlite",
+    "orm",
+    "react-native",
+    "expo",
+    "expo-sqlite-qrapper"
+  ],
+  "author": "Alen Toma",
+  "license": "MIT",
+  "dependencies": {
+    "expo-sqlite": "^9.2.1"
+  }
+}
