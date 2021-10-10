@@ -1,4 +1,4 @@
-import { IBaseModule, IWatcher, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param } from './expo.sql.wrapper.types'
+import { IBaseModule, IWatcher, IQuery, IDatabase, Operation } from './expo.sql.wrapper.types'
 import { createQueryResultType, validateTableName, Query, single } from './SqlQueryBuilder'
 import TablaStructor, { ColumnType } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
@@ -9,7 +9,7 @@ export default function <D extends string>(databaseTables: TablaStructor<D>[], g
 
 class Watcher<T, D extends string> implements IWatcher<T, D> {
     tableName: D;
-    onSave?: (item: T[]) => Promise<void>;
+    onSave?: (item: T[], operation: Operation) => Promise<void>;
     onDelete?: (item: T[]) => Promise<void>;
     readonly removeWatch: () => void;
     constructor(tableName: D) {
@@ -32,7 +32,7 @@ class Database<D extends string> implements IDatabase<D> {
 
     //#region private methods
 
-    private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", tableName?: D) {
+    private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", subOperation?: Operation, tableName?: D) {
         if (!tableName)
             return;
         var watchers = Database.watchers.filter(x => {
@@ -42,11 +42,11 @@ class Database<D extends string> implements IDatabase<D> {
         var tItems = Array.isArray(items) ? items : [items];
 
         for (var watcher of watchers) {
-            if (operation === "onSave")
-                await watcher?.onSave(tItems);
+            if (operation === "onSave" && watcher.onSave)
+                await watcher.onSave(tItems, subOperation ?? "INSERT");
 
-            if (operation === "onDelete")
-                await watcher?.onDelete(tItems);
+            if (operation === "onDelete" && watcher.onDelete)
+                await watcher.onDelete(tItems);
         }
     }
 
@@ -61,7 +61,7 @@ class Database<D extends string> implements IDatabase<D> {
                 console.log('Executing Save...');
                 var uiqueItem = await this.getUique(item);
                 var keys = (await this.allowedKeys(item.tableName)).filter((x) => Object.keys(item).includes(x));
-
+                await this.triggerWatch(item, "onSave", uiqueItem ? "UPDATE" : "INSERT", tableName);
                 let query = '';
                 let args = [] as any[];
                 if (uiqueItem) {
@@ -195,17 +195,16 @@ class Database<D extends string> implements IDatabase<D> {
         var tItems = Array.isArray(items) ? items : [items];
         var returnItem = [] as T[];
         for (var item of tItems) {
-            returnItem.push(await this.localSave<T>(item));
-            await this.triggerWatch(item, "onSave", tableName);
+            returnItem.push(await this.localSave<T>(item) ?? item as any);
         }
-        return returnItem;
+        return returnItem as T[];
     }
 
     async delete(items: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) {
         var tItems = Array.isArray(items) ? items : [items];
         for (var item of tItems) {
             await this.localDelete(item);
-            await this.triggerWatch(item, "onDelete", tableName);
+            await this.triggerWatch(item, "onDelete", undefined,  tableName);
         }
     }
 

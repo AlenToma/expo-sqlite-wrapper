@@ -10,6 +10,8 @@ export class IBaseModule<D extends string> {
     }
 }
 
+export type Operation = "UPDATE" | "INSERT";
+
 export declare type SingleValue = string | number | boolean | undefined | null;
 export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
@@ -21,7 +23,7 @@ export interface IChildQueryLoader<T, B, D extends string> {
 }
 
 export interface IWatcher<T, D extends string> {
-    onSave?: (item: T[]) => Promise<void>;
+    onSave?: (item: T[], operation: Operation) => Promise<void>;
     onDelete?: (item: T[]) => Promise<void>;
     readonly removeWatch: () => void;
 }
@@ -97,7 +99,7 @@ export interface IDatabase<D extends string> {
     watch: <T>(tableName: D) => IWatcher<T, D>;
     query: <T>(tableName: D) => IQuery<T, D>;
     find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>
-    save: <T>(item?: IBaseModule<D> | (IBaseModule<D>[]), insertOnly?: Boolean, tableName?: D) => Promise<T[]>;
+    save: <T>(item: IBaseModule<D> | (IBaseModule<D>[]), insertOnly?: Boolean, tableName?: D) => Promise<T[]>;
     where: <T>(tableName: D, query?: any | T) => Promise<T[]>;
     delete: (item: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) => Promise<void>;
     execute: (query: string, args?: any[]) => Promise<boolean>;
