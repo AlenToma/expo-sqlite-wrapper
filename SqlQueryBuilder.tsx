@@ -1,7 +1,7 @@
 import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param } from './expo.sql.wrapper.types'
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
-    result.savechanges = async ()=>  { return (await database.save<T>(result as any))[0] as IQueryResultItem<T, D> };
+    result.savechanges = async () => { return (await database.save<T>(result as any))[0] as IQueryResultItem<T, D> };
     result.delete = async () => await database.delete(result as any);
     if (children && children.length > 0) {
         for (var x of children) {
@@ -36,7 +36,7 @@ export const validateTableName = function <T, D extends string>(item: IBaseModul
     return item;
 }
 
-export const single = function<T>(items: any[]) {
+export const single = function <T>(items: any[]) {
     if (!items || items.length <= 0)
         return undefined;
     return items[0] as T;
@@ -171,6 +171,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     case Param.GreaterThan:
                     case Param.IN:
                     case Param.NotEqualTo:
+                    case Param.Contains:
                     case Param.EqualAndGreaterThen:
                     case Param.EqualAndLessThen:
                         if (next === undefined) {
@@ -293,6 +294,11 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
+    Contains<B>(value: ((x: T) => B) | SingleValue) {
+        if (this.Queries.length > 0) this.validateValue(value, Param.NotEqualTo);
+        return this;
+    }
+
     LoadChildren<B>(childTableName: D, parentProperty: (x: T) => B) {
         var item = {
             parentProperty: getColumns(parentProperty),
@@ -346,6 +352,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                 case Param.LessThan:
                 case Param.GreaterThan:
                 case Param.IN:
+                case Param.Contains:
                 case Param.NotEqualTo:
                 case Param.EqualAndGreaterThen:
                 case Param.EqualAndLessThen:
@@ -372,7 +379,9 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                             if (x !== undefined) result.values.push(x);
                         });
                     } else if (value.queryValue !== undefined) {
-                        appendSql('?');
+                        if (pValue == Param.Contains)
+                            appendSql('%?%');
+                        else appendSql('?');
                         if (Array.isArray(value.queryValue))
                             value.queryValue = (value.queryValue as []).join(',');
                         result.values.push(value.queryValue);

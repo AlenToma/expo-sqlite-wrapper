@@ -48,6 +48,7 @@ export enum Param {
     NotIn = '#NOT IN',
     NULL = '#NULL',
     NotEqualTo = '#!=',
+    Contains = '#like',
     EqualAndGreaterThen = '#>=',
     EqualAndLessThen = '#<=',
 }
@@ -61,6 +62,7 @@ export interface IQuaryResult<D extends string> {
 export interface IQuery<T, D extends string> {
     Column: <B>(item: (x: T) => B) => IQuery<T, D>;
     EqualTo: <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
+    Contains:  <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
     NotEqualTo: <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
     EqualAndGreaterThen: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
     EqualAndLessThen: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
