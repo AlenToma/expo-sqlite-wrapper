@@ -32,7 +32,7 @@ class Database<D extends string> implements IDatabase<D> {
 
     //#region private methods
 
-    private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onSelect" | "onDelete", tableName?: D,) {
+    private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", tableName?: D) {
         if (!tableName)
             return;
         var watchers = Database.watchers.filter(x => {
@@ -49,29 +49,6 @@ class Database<D extends string> implements IDatabase<D> {
                 await watcher?.onDelete(tItems);
         }
     }
-
-    private allowedKeys = (tableName: string) => {
-        return new Promise(async (resolve, reject) => {
-            (await this.dataBase()).transaction(
-                (x) =>
-                    x.executeSql(
-                        `PRAGMA table_info(${tableName})`,
-                        undefined,
-                        (trans, data) => {
-                            var keys = [] as string[];
-                            for (var i = 0; i < data.rows.length; i++) {
-                                if (data.rows.item(i).name != 'id')
-                                    keys.push(data.rows.item(i).name);
-                            }
-                            resolve(keys);
-                        },
-                    ),
-                (error) => {
-                    reject(error);
-                },
-            );
-        }) as Promise<string[]>;
-    };
 
     private localSave<T>(item?: IBaseModule<D>, insertOnly?: Boolean, tableName?: D) {
         return new Promise(async (resolve, reject) => {
@@ -173,6 +150,29 @@ class Database<D extends string> implements IDatabase<D> {
 
     //#region public Methods for Select
 
+    public allowedKeys = (tableName: D) => {
+        return new Promise(async (resolve, reject) => {
+            (await this.dataBase()).transaction(
+                (x) =>
+                    x.executeSql(
+                        `PRAGMA table_info(${tableName})`,
+                        undefined,
+                        (trans, data) => {
+                            var keys = [] as string[];
+                            for (var i = 0; i < data.rows.length; i++) {
+                                if (data.rows.item(i).name != 'id')
+                                    keys.push(data.rows.item(i).name);
+                            }
+                            resolve(keys);
+                        },
+                    ),
+                (error) => {
+                    reject(error);
+                },
+            );
+        }) as Promise<string[]>;
+    };
+
     public watch<T>(tableName: D) {
         var watcher = new Watcher<T, D>(tableName) as IWatcher<T, D>;
         Database.watchers.push(watcher);
@@ -196,14 +196,16 @@ class Database<D extends string> implements IDatabase<D> {
         var returnItem = [] as T[];
         for (var item of tItems) {
             returnItem.push(await this.localSave<T>(item));
+            await this.triggerWatch(item, "onSave", tableName);
         }
-        return Array.isArray(items) ? returnItem : returnItem[0];
+        return returnItem;
     }
 
-    async delete<T>(items: T | (T[]), tableName?: string) {
+    async delete(items: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) {
         var tItems = Array.isArray(items) ? items : [items];
         for (var item of tItems) {
             await this.localDelete(item);
+            await this.triggerWatch(item, "onDelete", tableName);
         }
     }
 

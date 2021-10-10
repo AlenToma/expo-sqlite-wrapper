@@ -1,8 +1,13 @@
 import TablaStructor from "./TableStructor";
 
-export interface IBaseModule<T extends string> {
-    id: number;
-    tableName: T;
+export class IBaseModule<D extends string> {
+    public id: number;
+    public tableName: D;
+
+    constructor(tableName: D, id?: number) {
+        this.tableName = tableName;
+        this.id = id ?? 0;
+    }
 }
 
 export declare type SingleValue = string | number | boolean | undefined | null;
@@ -78,20 +83,21 @@ export interface IQuery<T, D extends string> {
 
 
 
-export type IQueryResultItem<T extends {}, D extends string> = T & {
-    savechanges: <T>() => Promise<IQueryResultItem<T, D>>,
+export type IQueryResultItem<T, D extends string> = T & {
+    savechanges:() => Promise<IQueryResultItem<T, D>>,
     delete: () => Promise<void>
 
 };
 
 export interface IDatabase<D extends string> {
+    allowedKeys: (tableName: D) => Promise<string[]>;
     asQueryable: <T>(item: IBaseModule<D>, tableName?: D) => Promise<IQueryResultItem<T, D>>
     watch: <T>(tableName: D) => IWatcher<T, D>;
     query: <T>(tableName: D) => IQuery<T, D>;
-    find: (query: string, args?: any[], tableName?: D) => Promise<any[]>
-    save: <T>(item?: any, insertOnly?: Boolean, tableName?: D) => Promise<T|(T[])>;
+    find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>
+    save: <T>(item?: IBaseModule<D> | (IBaseModule<D>[]), insertOnly?: Boolean, tableName?: D) => Promise<T[]>;
     where: <T>(tableName: D, query?: any | T) => Promise<T[]>;
-    delete: (item: any, tableName?: D) => Promise<void>;
+    delete: (item: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) => Promise<void>;
     execute: (query: string, args?: any[]) => Promise<boolean>;
     dropTables: () => Promise<void>;
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;

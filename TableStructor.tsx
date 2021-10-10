@@ -20,7 +20,7 @@ export interface IColumnStructor {
     isUique?: boolean;
 }
 
-export default class TablaStructor<D extends string> {
+export default class TableStructor<D extends string> {
     tableName: D;
     columns: IColumnStructor[];
     constraints?:IConstraint[];

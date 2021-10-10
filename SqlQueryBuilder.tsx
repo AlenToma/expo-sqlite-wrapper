@@ -1,8 +1,8 @@
 import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param } from './expo.sql.wrapper.types'
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
-    result.savechanges = async function <T>() { return await database.save<T>(result) as IQueryResultItem<T, D> };
-    result.delete = async () => await database.delete(result);
+    result.savechanges = async ()=>  { return (await database.save<T>(result as any))[0] as IQueryResultItem<T, D> };
+    result.delete = async () => await database.delete(result as any);
     if (children && children.length > 0) {
         for (var x of children) {
             if (x.childTableName.length > 0 && x.childProperty.length > 0 && x.parentProperty.length > 0 && x.parentTable.length > 0) {
