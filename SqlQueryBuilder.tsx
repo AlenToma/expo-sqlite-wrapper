@@ -1,4 +1,4 @@
-import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param } from './expo.sql.wrapper.types'
+import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
     result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any))[0], database) };
@@ -6,8 +6,11 @@ export const createQueryResultType = async function <T, D extends string>(item: 
     if (children && children.length > 0) {
         for (var x of children) {
             if (x.childTableName.length > 0 && x.childProperty.length > 0 && x.parentProperty.length > 0 && x.parentTable.length > 0 && x.assignTo.length > 0) {
-                if (item[x.parentProperty] === undefined)
+                if (item[x.parentProperty] === undefined) {
+                    if (x.isArray)
+                        item[x.assignTo] = [];
                     continue;
+                }
                 var filter = {} as any
                 filter[x.childProperty] = item[x.parentProperty];
                 var items = await database.where(x.childTableName as D, filter);
@@ -52,29 +55,37 @@ class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B
         this.tableName = tableName;
     }
 
-    With<E>(item: (x: E) => any) {
+    With<E>(item: ((x: E) => any) | string) {
         var child = this.parent.Children[this.parent.Children.length - 1];
-        child.childProperty = getColumns(item) ?? "";
+        child.childProperty = getColumns("function " + item.toString()) ?? "";
         child.childTableName = this.tableName;
         return this;
     }
 
-    AssignTo<S, E>(item: (x: B) => E) {
+    AssignTo<S, E>(item: ((x: B) => E) | string) {
         var child = this.parent.Children[this.parent.Children.length - 1];
-        child.assignTo = getColumns(item) ?? "";
+        child.assignTo = getColumns("function " + item.toString()) ?? "";
         return this.parent as IQuery<B, D>;
     }
 }
 
-const getColumns = (fn: any) => {
-    var req = new RegExp('return?.*', 'g');
-    var str = req
-        .exec(fn.toString())?.[0]
-        .replace('return', '')
-        .replace(';', '')
-        .split('.');
-    return str?.[str.length - 1];
+const isFunc = (value: any) => {
+    return value.toString().indexOf('function') !== -1;
 };
+
+const getColumns = (fn: any) => {
+    if (!isFunc(fn))
+        return fn;
+    var str = fn.toString()
+    if (str.indexOf('.') !== -1) {
+        str = str.substring(str.indexOf('.') + 1)
+    }
+    if (str.indexOf('[') !== -1) {
+        str = str.substring(str.indexOf('[') + 1);
+    }
+    str = str.replace(/\]|'|"|\+|return|;|\.|\}|\{|\(|\)|function| /gim, '').replace(/\r?\n|\r/g, "");
+    return str;
+}
 
 export class Query<T, D extends string> implements IQuery<T, D>{
     Queries: any[] = [];
@@ -83,17 +94,12 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     database: IDatabase<D>;
 
     private currentIndex: number = 0;
-    constructor(tableNamd: D, database: IDatabase<D>) {
+    constructor(tableName: D, database: IDatabase<D>) {
         this.database = database;
-        this.tableName = tableNamd;
-
+        this.tableName = tableName;
     }
 
     //#region private methods
-
-    private isFunc = (value: any) => {
-        return value.toString().indexOf('function') !== -1;
-    };
 
     private hasNext() {
         return this.Queries.length > 0 && this.currentIndex < this.Queries.length;
@@ -170,6 +176,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     case Param.LessThan:
                     case Param.GreaterThan:
                     case Param.IN:
+                    case Param.NotIn:
                     case Param.NotEqualTo:
                     case Param.Contains:
                     case Param.EqualAndGreaterThen:
@@ -201,8 +208,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                         }
                         break;
                     case Param.NULL:
-                        break;
-                    case Param.NotIn:
+                    case Param.NotNULL:
                         break;
                     default: {
                     }
@@ -221,28 +227,28 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     //#endregion
 
     //#region public Methods
-    Column<B>(item: (x: T) => B) {
-        this.Queries.push(item.toString());
+    Column<B>(item: ((x: T) => B) | string) {
+        this.Queries.push("function " + item.toString());
         return this;
     }
 
-    EqualTo<B>(value: ((x: T) => B) | SingleValue) {
+    EqualTo(value: SingleValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.EqualTo);
         return this
     }
 
-    NotEqualTo<B>(value: ((x: T) => B) | SingleValue) {
+    NotEqualTo(value: SingleValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.NotEqualTo);
         return this;
     }
 
-    EqualAndGreaterThen<B>(value: ((x: T) => B) | NumberValue) {
+    EqualAndGreaterThen(value: NumberValue) {
         if (this.Queries.length > 0)
             this.validateValue(value, Param.EqualAndGreaterThen);
         return this;
     }
 
-    EqualAndLessThen<B>(value: ((x: T) => B) | NumberValue) {
+    EqualAndLessThen(value: NumberValue) {
         if (this.Queries.length > 0)
             this.validateValue(value, Param.EqualAndLessThen);
         return this;
@@ -268,24 +274,24 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    GreaterThan<B>(value: ((x: T) => B) | NumberValue) {
+    GreaterThan(value: NumberValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.GreaterThan);
         return this;
     }
 
 
-    LessThan<B>(value: ((x: T) => B) | NumberValue) {
+    LessThan(value: NumberValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.LessThan);
         return this;
     }
 
-    IN<B>(value: ((x: T) => B) | ArrayValue) {
+    IN(value: ArrayValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.IN);
         return this;
     }
 
-    NotIn() {
-        if (this.Queries.length > 0) this.Queries.push(Param.NotIn);
+    NotIn(value: ArrayValue) {
+        if (this.Queries.length > 0) this.validateValue(value, Param.NotIn);
         return this;
     }
 
@@ -294,14 +300,19 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    Contains<B>(value: ((x: T) => B) | SingleValue) {
-        if (this.Queries.length > 0) this.validateValue(value, Param.NotEqualTo);
+    NotNull() {
+        if (this.Queries.length > 0) this.Queries.push(Param.NotNULL);
         return this;
     }
 
-    LoadChildren<B>(childTableName: D, parentProperty: (x: T) => B) {
+    Contains(value: StringValue) {
+        if (this.Queries.length > 0) this.validateValue(value, Param.Contains);
+        return this;
+    }
+
+    LoadChildren<B>(childTableName: D, parentProperty: ((x: T) => B) | string) {
         var item = {
-            parentProperty: getColumns(parentProperty),
+            parentProperty: getColumns("function " + parentProperty.toString()),
             parentTable: this.tableName,
             childTableName: childTableName,
             childProperty: '',
@@ -313,9 +324,9 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
 
-    LoadChild<B>(childTableName: D, parentProperty: (x: T) => B) {
+    LoadChild<B>(childTableName: D, parentProperty: ((x: T) => B) | string) {
         var item = {
-            parentProperty: getColumns(parentProperty),
+            parentProperty: getColumns("function " + parentProperty.toString()),
             parentTable: this.tableName,
             childTableName: childTableName,
             childProperty: '',
@@ -353,21 +364,18 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                 case Param.LessThan:
                 case Param.GreaterThan:
                 case Param.IN:
+                case Param.NotIn:
                 case Param.Contains:
                 case Param.NotEqualTo:
+                case Param.NotNULL:
+                case Param.NULL:
                 case Param.EqualAndGreaterThen:
                 case Param.EqualAndLessThen:
                     value = value.toString().substring(1);
                     appendSql(value);
                     break;
-                case Param.NULL:
-                    appendSql('IS NULL');
-                    break;
-                case Param.NotIn:
-                    appendSql('IS NOT NULL');
-                    break;
                 default: {
-                    if (this.isFunc(value)) appendSql(getColumns(value) ?? '');
+                    if (isFunc(value)) appendSql(getColumns(value) ?? '');
                     else if (
                         value.queryValue !== undefined &&
                         (pValue === Param.IN || pValue == Param.NotIn)

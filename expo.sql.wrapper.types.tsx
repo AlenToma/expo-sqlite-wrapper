@@ -15,11 +15,12 @@ export type Operation = "UPDATE" | "INSERT";
 export declare type SingleValue = string | number | boolean | undefined | null;
 export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
+export declare type StringValue = string | undefined;
 
 
 export interface IChildQueryLoader<T, B, D extends string> {
-    With: <E>(item: (x: E) => any) => IChildQueryLoader<T, B, D>;
-    AssignTo: <S, E>(item: (x: B) => E) => IQuery<B, D>;
+    With: <E>(item: string|((x: E) => any)) => IChildQueryLoader<T, B, D>;
+    AssignTo: <S, E>(item: ((x: B) => E)|string) => IQuery<B, D>;
 }
 
 export interface IWatcher<T, D extends string> {
@@ -48,7 +49,8 @@ export enum Param {
     GreaterThan = '#>',
     IN = '#IN',
     NotIn = '#NOT IN',
-    NULL = '#NULL',
+    NULL = '#IS NULL',
+    NotNULL ="#IS NOT NULL",
     NotEqualTo = '#!=',
     Contains = '#like',
     EqualAndGreaterThen = '#>=',
@@ -62,23 +64,24 @@ export interface IQuaryResult<D extends string> {
 }
 
 export interface IQuery<T, D extends string> {
-    Column: <B>(item: (x: T) => B) => IQuery<T, D>;
-    EqualTo: <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
-    Contains:  <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
-    NotEqualTo: <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
-    EqualAndGreaterThen: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
-    EqualAndLessThen: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
+    Column: <B>(item: ((x: T) => B)|string) => IQuery<T, D>;
+    EqualTo: (value: SingleValue) => IQuery<T, D>;
+    Contains:  (value: StringValue) => IQuery<T, D>;
+    NotEqualTo: (value: SingleValue) => IQuery<T, D>;
+    EqualAndGreaterThen: (value: NumberValue) => IQuery<T, D>;
+    EqualAndLessThen: (value: NumberValue) => IQuery<T, D>;
     Start: () => IQuery<T, D>;
     End: () => IQuery<T, D>;
     OR: () => IQuery<T, D>;
     AND: () => IQuery<T, D>;
-    GreaterThan: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
-    LessThan: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
-    IN: <B>(value: ((x: T) => B) | ArrayValue) => IQuery<T, D>;
-    NotIn: () => IQuery<T, D>;
+    GreaterThan: (value: NumberValue) => IQuery<T, D>;
+    LessThan: (value: NumberValue) => IQuery<T, D>;
+    IN: (value: ArrayValue) => IQuery<T, D>;
+    NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
-    LoadChildren: <B>(childTableName: D, parentProperty: (x: T) => B) => IChildQueryLoader<B, T, D>;
-    LoadChild: <B>(childTableName: D, parentProperty: (x: T) => B) => IChildQueryLoader<B, T, D>
+    NotNull: () => IQuery<T, D>;
+    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>;
+    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     findOrSave: (item: IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
     toList: () => Promise<IQueryResultItem<T, D>[]>;

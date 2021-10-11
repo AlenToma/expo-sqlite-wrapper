@@ -104,7 +104,10 @@ const addItem= async ()=> {
   // this will be converted to [SELECT * FROM PARENTS WHERE name = ?] WHERE ? is the arguments
    var item = await dbContext.database.where<Parent>("Parents", { name: "testName"})
   // and there is a much uniqe way, for IQuery read below to see what you methods it containe
-   var item = await dbContext.database.query<Parent>("Parents").Column(x=> x.name).EqualTo("testName").firstOrDefault();
+   var item = await dbContext.database.query<Parent>("Parents")
+   .Column(x=> x.name)
+   .EqualTo("testName")
+   .firstOrDefault();
    item.name= "test"
    item.saveChanges();
  
@@ -147,25 +150,26 @@ const addItem= async ()=> {
 ### IQuery
 ```js
 interface IQuery<T, D extends string> {
-    Column: <B>(item: (x: T) => B) => IQuery<T, D>;
-    EqualTo: <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
-    Contains:  <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
-    NotEqualTo: <B>(value: ((x: T) => B) | SingleValue) => IQuery<T, D>;
-    EqualAndGreaterThen: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
-    EqualAndLessThen: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
+    Column: <B>(item: ((x: T) => B)|string) => IQuery<T, D>;
+    EqualTo: (value: SingleValue) => IQuery<T, D>;
+    Contains:  (value: StringValue) => IQuery<T, D>;
+    NotEqualTo: (value: SingleValue) => IQuery<T, D>;
+    EqualAndGreaterThen: <B>(value: NumberValue) => IQuery<T, D>;
+    EqualAndLessThen: (value: NumberValue) => IQuery<T, D>;
     Start: () => IQuery<T, D>;
     End: () => IQuery<T, D>;
     OR: () => IQuery<T, D>;
     AND: () => IQuery<T, D>;
-    GreaterThan: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
-    LessThan: <B>(value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
-    IN: <B>(value: ((x: T) => B) | ArrayValue) => IQuery<T, D>;
-    NotIn: () => IQuery<T, D>;
+    GreaterThan: (value: NumberValue) => IQuery<T, D>;
+    LessThan: (value: ((x: T) => B) | NumberValue) => IQuery<T, D>;
+    IN: (value: ArrayValue) => IQuery<T, D>;
+    NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
+    NotNull: () => IQuery<T, D>;
     // Load array
-    LoadChildren: <B>(childTableName: D, parentProperty: (x: T) => B) => IChildQueryLoader<B, T, D>;
+    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>;
     // load object
-    LoadChild: <B>(childTableName: D, parentProperty: (x: T) => B) => IChildQueryLoader<B, T, D>
+    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>
     // get the first item or undefined
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     // Try to find the Queried item if not found then insert item and return it from the database.
@@ -207,10 +211,34 @@ export interface IDatabase<D extends string> {
 }
 ```
 ### Lastly
-If you use obfuscator-io-metro-plugin and use IQuery
-You should execlude those part of the code by using /* javascript-obfuscator:disable */ - Disable obfuscation for the rest of the file 
-as it interfere with IQuery
-when You for example use Column(x=> x.name), the javascript-obfuscator will rename those expression and it will not be valid anymore.
+If you use obfuscator-io-metro-plugin and use IQuery expression eg `Column(x=> x.name)`
+then you should have those settings below. as the obfuscator will rewite all properties and the library can not read those.
+
+```
+const jsoMetroPlugin = require("obfuscator-io-metro-plugin")(
+  {
+    compact: false,
+    sourceMap: true,
+    controlFlowFlattening: true,
+    controlFlowFlatteningThreshold: 0, // Very Importend
+    numbersToExpressions: true,
+    simplify: true,
+    shuffleStringArray: true,
+    splitStrings: true,
+    stringArrayThreshold: 0 // Very Importend
+  },
+  {
+    runInDev: false /* optional */,
+    logObfuscatedFiles: true /* optional generated files will be located at ./.jso */,
+    sourceMapLocation:
+      "./index.android.bundle.map" /* optional  only works if sourceMap: true in obfuscation option */,
+  }
+);
+
+```
+
+Otherwise if you still want to use more advanced obfuscator settings then you should use `Column("name")` 
+instead of expression `x=> x.name` as the library could still read the string and count it as a column.
 
 This Library is new and I am using it for my project and decided too put it on npm, so there may be some issues discovered later.
 Please report those so I could make sure to fix them.
