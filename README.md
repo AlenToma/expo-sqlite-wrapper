@@ -128,7 +128,8 @@ const addItem= async ()=> {
     // you could also watch the db operation very easy.
     useEffect(()=> {
      var watcher = dbContext.database.watch<Parent>("Parents");
-     watcher.onSave = async (item)=> {
+     watcher.onSave = async (item, operation)=> {
+       // operation = "INSERT" OR "UPDATE"
         console.log(item);
      }
      
@@ -182,7 +183,8 @@ export interface IDatabase<D extends string> {
     allowedKeys: (tableName: D) => Promise<string[]>;
     // convert object to IQueryResultItem
     asQueryable: <T>(item: IBaseModule<D>, tableName?: D) => Promise<IQueryResultItem<T, D>>
-    // add a watcher for the selected table
+    // add a watcher for the selected table, this is a global watch. 
+    // no matter which dbContext you use it will trigger when a change to the database item for the selected table is chaged
     watch: <T>(tableName: D) => IWatcher<T, D>;
     // start a Query
     query: <T>(tableName: D) => IQuery<T, D>;
@@ -204,6 +206,11 @@ export interface IDatabase<D extends string> {
     tableHasChanges: (item: TablaStructor<D>) => Promise<boolean>;
 }
 ```
+### Lastly
+If you use obfuscator-io-metro-plugin and use IQuery
+You should execlude those part of the code by using /* javascript-obfuscator:disable */ - Disable obfuscation for the rest of the file 
+as it interfere with IQuery
+when You for example use Column(x=> x.name), the javascript-obfuscator will rename those expression and it will not be valid anymore.
 
 This Library is new and I am using it for my project and decided too put it on npm, so there may be some issues discovered later.
 Please report those so I could make sure to fix them.

@@ -1,11 +1,11 @@
 import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param } from './expo.sql.wrapper.types'
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
-    result.savechanges = async () => { return (await database.save<T>(result as any))[0] as IQueryResultItem<T, D> };
+    result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any))[0], database) };
     result.delete = async () => await database.delete(result as any);
     if (children && children.length > 0) {
         for (var x of children) {
-            if (x.childTableName.length > 0 && x.childProperty.length > 0 && x.parentProperty.length > 0 && x.parentTable.length > 0) {
+            if (x.childTableName.length > 0 && x.childProperty.length > 0 && x.parentProperty.length > 0 && x.parentTable.length > 0 && x.assignTo.length > 0) {
                 if (item[x.parentProperty] === undefined)
                     continue;
                 var filter = {} as any
@@ -37,7 +37,7 @@ export const validateTableName = function <T, D extends string>(item: IBaseModul
 }
 
 export const single = function <T>(items: any[]) {
-    if (!items || items.length <= 0)
+    if (!items || items.length === undefined || items.length <= 0)
         return undefined;
     return items[0] as T;
 }
@@ -306,6 +306,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
             childTableName: childTableName,
             childProperty: '',
             isArray: true,
+            assignTo: "",
         } as IChildLoader<D>;
         this.Children.push(item);
         return (new ChildQueryLoader<B, T, D>(this, childTableName) as any) as IChildQueryLoader<B, T, D>;
@@ -319,6 +320,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
             childTableName: childTableName,
             childProperty: '',
             isArray: false,
+            assignTo: "",
         } as IChildLoader<D>;
         this.Children.push(item);
         return (new ChildQueryLoader<B, T, D>(this, childTableName) as any) as IChildQueryLoader<B, T, D>;
@@ -331,8 +333,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         this.validate();
 
         var result = {
-            sql: `SELECT * FROM ${this.tableName} ${this.Queries.length > 0 ? ' WHERE ' : ''
-                }`,
+            sql: `SELECT * FROM ${this.tableName} ${this.Queries.length > 0 ? ' WHERE ' : ''}`,
             values: [],
             children: this.Children,
         } as IQuaryResult<D>;
@@ -408,7 +409,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         (item as any).tableName = this.tableName;
         var dbItem = single(await this.database.find(sqls.sql, sqls.values, this.tableName));
         if (!dbItem) {
-            dbItem = await this.database.save<T>(item, false, this.tableName);
+            dbItem = (await this.database.save<T>(item, false, this.tableName))[0];
 
         }
         (dbItem as any).tableName = this.tableName;

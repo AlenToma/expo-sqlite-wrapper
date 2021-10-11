@@ -6,42 +6,53 @@ import * as SQLite from 'expo-sqlite';
 export default function <D extends string>(databaseTables: TablaStructor<D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>) {
     return new Database<D>(databaseTables, getDatabase) as IDatabase<D>;
 }
-
+const watchers: IWatcher<any, string>[] = [];
 class Watcher<T, D extends string> implements IWatcher<T, D> {
     tableName: D;
     onSave?: (item: T[], operation: Operation) => Promise<void>;
     onDelete?: (item: T[]) => Promise<void>;
     readonly removeWatch: () => void;
     constructor(tableName: D) {
-        this.removeWatch = () => Database.watchers.splice(Database.watchers.findIndex(x => x == this), 1);
+        this.removeWatch = () => watchers.splice(watchers.findIndex(x => x == this), 1);
         this.tableName = tableName;
     }
 
 }
+
+
 
 class Database<D extends string> implements IDatabase<D> {
     private dataBase: () => Promise<SQLite.WebSQLDatabase>;
     private tables: TablaStructor<D>[];
     private timeout: any = undefined;
     private static dbIni: boolean = false;
-    public static watchers: IWatcher<any, string>[] = [];
+
+    private db?: SQLite.WebSQLDatabase;
     constructor(databaseTables: TablaStructor<D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>) {
-        this.dataBase = getDatabase;
+        this.dataBase = async () => {
+            if (!this.db === undefined)
+                this.db = await getDatabase();
+            return this.db ?? await getDatabase();
+        };
         this.tables = databaseTables;
     }
 
     //#region private methods
 
     private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", subOperation?: Operation, tableName?: D) {
+        var tItems = Array.isArray(items) ? items : [items];
+        var s = single(tItems) as any;
+        if (!tableName && s && s.tableName)
+            tableName = s.tableName
         if (!tableName)
             return;
-        var watchers = Database.watchers.filter(x => {
+        const w = watchers.filter(x => {
             var watcher = x as Watcher<T, D>;
             return watcher.tableName == tableName;
         }) as Watcher<T, D>[];
-        var tItems = Array.isArray(items) ? items : [items];
 
-        for (var watcher of watchers) {
+
+        for (var watcher of w) {
             if (operation === "onSave" && watcher.onSave)
                 await watcher.onSave(tItems, subOperation ?? "INSERT");
 
@@ -141,9 +152,7 @@ class Database<D extends string> implements IDatabase<D> {
             console.log(item);
             return;
         }
-        return single(((
-            await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName)
-        )).map((x: any) => { x.tableName = item.tableName; return x; })) as T | undefined
+        return single(((await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName))).map((x: any) => { x.tableName = item.tableName; return x; })) as T | undefined
     }
 
     //#endregion
@@ -175,7 +184,7 @@ class Database<D extends string> implements IDatabase<D> {
 
     public watch<T>(tableName: D) {
         var watcher = new Watcher<T, D>(tableName) as IWatcher<T, D>;
-        Database.watchers.push(watcher);
+        watchers.push(watcher);
         return watcher;
     }
 
@@ -204,7 +213,7 @@ class Database<D extends string> implements IDatabase<D> {
         var tItems = Array.isArray(items) ? items : [items];
         for (var item of tItems) {
             await this.localDelete(item);
-            await this.triggerWatch(item, "onDelete", undefined,  tableName);
+            await this.triggerWatch(item, "onDelete", undefined, tableName);
         }
     }
 
