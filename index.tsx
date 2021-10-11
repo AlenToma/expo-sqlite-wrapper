@@ -1,4 +1,4 @@
-import { IBaseModule, SingleValue, ArrayValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher } from './expo.sql.wrapper.types'
+import { IBaseModule, SingleValue, ArrayValue,StringValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher } from './expo.sql.wrapper.types'
 import createDbContext from './Database'
 import TableStructor, { ColumnType } from './TableStructor'
 
@@ -14,6 +14,7 @@ export type {
     SingleValue,
     ArrayValue,
     NumberValue,
+    StringValue,
     IQuery,
     IQueryResultItem,
     IDatabase,

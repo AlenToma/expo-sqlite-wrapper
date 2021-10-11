@@ -11,7 +11,6 @@ export class IBaseModule<D extends string> {
 }
 
 export type Operation = "UPDATE" | "INSERT";
-
 export declare type SingleValue = string | number | boolean | undefined | null;
 export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
@@ -39,6 +38,7 @@ export interface IChildLoader<D extends string> {
 }
 
 
+
 export enum Param {
     StartParameter = '#(',
     EqualTo = '#=',
@@ -53,6 +53,8 @@ export enum Param {
     NotNULL ="#IS NOT NULL",
     NotEqualTo = '#!=',
     Contains = '#like',
+    StartWith= "S#like",
+    EndWith= "E#like",
     EqualAndGreaterThen = '#>=',
     EqualAndLessThen = '#<=',
 }
@@ -67,6 +69,8 @@ export interface IQuery<T, D extends string> {
     Column: <B>(item: ((x: T) => B)|string) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
     Contains:  (value: StringValue) => IQuery<T, D>;
+    StartWith:  (value: StringValue) => IQuery<T, D>;
+    EndWith:  (value: StringValue) => IQuery<T, D>;
     NotEqualTo: (value: SingleValue) => IQuery<T, D>;
     EqualAndGreaterThen: (value: NumberValue) => IQuery<T, D>;
     EqualAndLessThen: (value: NumberValue) => IQuery<T, D>;
@@ -87,8 +91,6 @@ export interface IQuery<T, D extends string> {
     toList: () => Promise<IQueryResultItem<T, D>[]>;
     getQueryResult: () => IQuaryResult<D>;
 }
-
-
 
 export type IQueryResultItem<T, D extends string> = T & {
     savechanges:() => Promise<IQueryResultItem<T, D>>,

@@ -157,6 +157,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         this.Queries.push({ queryValue: value });
     }
 
+    
     private validate() {
         var totalLoob = this.Queries.length;
         for (var i = 0; i < totalLoob; i++) {
@@ -179,6 +180,8 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     case Param.NotIn:
                     case Param.NotEqualTo:
                     case Param.Contains:
+                    case Param.StartWith:
+                    case Param.EndWith:
                     case Param.EqualAndGreaterThen:
                     case Param.EqualAndLessThen:
                         if (next === undefined) {
@@ -211,6 +214,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     case Param.NotNULL:
                         break;
                     default: {
+
                     }
                 }
                 if (breakit) {
@@ -310,6 +314,16 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
+    StartWith(value: StringValue) {
+        if (this.Queries.length > 0) this.validateValue(value, Param.StartWith);
+        return this;
+    }
+
+    EndWith(value: StringValue) {
+        if (this.Queries.length > 0) this.validateValue(value, Param.EndWith);
+        return this;
+    }
+
     LoadChildren<B>(childTableName: D, parentProperty: ((x: T) => B) | string) {
         var item = {
             parentProperty: getColumns("function " + parentProperty.toString()),
@@ -340,6 +354,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
 
 
+
     getQueryResult() {
         this.validate();
 
@@ -364,8 +379,6 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                 case Param.LessThan:
                 case Param.GreaterThan:
                 case Param.IN:
-                case Param.NotIn:
-                case Param.Contains:
                 case Param.NotEqualTo:
                 case Param.NotNULL:
                 case Param.NULL:
@@ -374,10 +387,15 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     value = value.toString().substring(1);
                     appendSql(value);
                     break;
+
+                case Param.Contains:
+                case Param.StartWith:
+                case Param.EndWith:
+                    appendSql("like");
+                    break;
                 default: {
                     if (isFunc(value)) appendSql(getColumns(value) ?? '');
-                    else if (
-                        value.queryValue !== undefined &&
+                    else if (value.queryValue !== undefined &&
                         (pValue === Param.IN || pValue == Param.NotIn)
                     ) {
                         var v = Array.isArray(value.queryValue)
@@ -388,9 +406,15 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                             if (x !== undefined) result.values.push(x);
                         });
                     } else if (value.queryValue !== undefined) {
-                        if (pValue == Param.Contains)
-                            appendSql('%?%');
-                        else appendSql('?');
+                        if (pValue == Param.Contains || pValue == Param.StartWith || pValue == Param.EndWith) {
+                            if (pValue == Param.Contains)
+                                value = { queryValue: `%${value.queryValue}%` }
+                            else if (pValue == Param.StartWith)
+                                value = { queryValue: `${value.queryValue}%` }
+                            else value = { queryValue: `%${value.queryValue}` }
+                        }
+
+                        appendSql('?');
                         if (Array.isArray(value.queryValue))
                             value.queryValue = (value.queryValue as []).join(',');
                         result.values.push(value.queryValue);
@@ -405,6 +429,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return result;
     }
 
+    
     async firstOrDefault() {
         var item = this.getQueryResult();
         console.log("Execute firstOrDefault:" + item.sql)

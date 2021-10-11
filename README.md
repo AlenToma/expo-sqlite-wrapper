@@ -153,6 +153,8 @@ interface IQuery<T, D extends string> {
     Column: <B>(item: ((x: T) => B)|string) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
     Contains:  (value: StringValue) => IQuery<T, D>;
+    StartWith:  (value: StringValue) => IQuery<T, D>;
+    EndWith:  (value: StringValue) => IQuery<T, D>;
     NotEqualTo: (value: SingleValue) => IQuery<T, D>;
     EqualAndGreaterThen: <B>(value: NumberValue) => IQuery<T, D>;
     EqualAndLessThen: (value: NumberValue) => IQuery<T, D>;
