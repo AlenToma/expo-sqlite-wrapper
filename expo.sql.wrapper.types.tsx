@@ -18,8 +18,8 @@ export declare type StringValue = string | undefined;
 
 
 export interface IChildQueryLoader<T, B, D extends string> {
-    With: <E>(item: string|((x: E) => any)) => IChildQueryLoader<T, B, D>;
-    AssignTo: <S, E>(item: ((x: B) => E)|string) => IQuery<B, D>;
+    With: <E>(item: string | ((x: E) => any)) => IChildQueryLoader<T, B, D>;
+    AssignTo: <S, E>(item: ((x: B) => E) | string) => IQuery<B, D>;
 }
 
 export interface IWatcher<T, D extends string> {
@@ -50,11 +50,11 @@ export enum Param {
     IN = '#IN',
     NotIn = '#NOT IN',
     NULL = '#IS NULL',
-    NotNULL ="#IS NOT NULL",
+    NotNULL = "#IS NOT NULL",
     NotEqualTo = '#!=',
     Contains = '#like',
-    StartWith= "S#like",
-    EndWith= "E#like",
+    StartWith = "S#like",
+    EndWith = "E#like",
     EqualAndGreaterThen = '#>=',
     EqualAndLessThen = '#<=',
 }
@@ -66,11 +66,11 @@ export interface IQuaryResult<D extends string> {
 }
 
 export interface IQuery<T, D extends string> {
-    Column: <B>(item: ((x: T) => B)|string) => IQuery<T, D>;
+    Column: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
-    Contains:  (value: StringValue) => IQuery<T, D>;
-    StartWith:  (value: StringValue) => IQuery<T, D>;
-    EndWith:  (value: StringValue) => IQuery<T, D>;
+    Contains: (value: StringValue) => IQuery<T, D>;
+    StartWith: (value: StringValue) => IQuery<T, D>;
+    EndWith: (value: StringValue) => IQuery<T, D>;
     NotEqualTo: (value: SingleValue) => IQuery<T, D>;
     EqualAndGreaterThen: (value: NumberValue) => IQuery<T, D>;
     EqualAndLessThen: (value: NumberValue) => IQuery<T, D>;
@@ -84,8 +84,8 @@ export interface IQuery<T, D extends string> {
     NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
     NotNull: () => IQuery<T, D>;
-    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>;
-    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>
+    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>;
+    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     findOrSave: (item: IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
     toList: () => Promise<IQueryResultItem<T, D>[]>;
@@ -93,7 +93,7 @@ export interface IQuery<T, D extends string> {
 }
 
 export type IQueryResultItem<T, D extends string> = T & {
-    savechanges:() => Promise<IQueryResultItem<T, D>>,
+    savechanges: () => Promise<IQueryResultItem<T, D>>,
     delete: () => Promise<void>
 
 };
@@ -110,5 +110,5 @@ export interface IDatabase<D extends string> {
     execute: (query: string, args?: any[]) => Promise<boolean>;
     dropTables: () => Promise<void>;
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
-    tableHasChanges: (item: TablaStructor<D>) => Promise<boolean>;
+    tableHasChanges: <T>(item: TablaStructor<T, D>) => Promise<boolean>;
 }

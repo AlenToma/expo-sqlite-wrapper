@@ -73,7 +73,7 @@ const isFunc = (value: any) => {
     return value.toString().indexOf('function') !== -1;
 };
 
-const getColumns = (fn: any) => {
+export const getColumns = (fn: any) => {
     if (!isFunc(fn))
         return fn;
     var str = fn.toString()

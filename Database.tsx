@@ -3,7 +3,7 @@ import { createQueryResultType, validateTableName, Query, single } from './SqlQu
 import TablaStructor, { ColumnType } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 
-export default function <D extends string>(databaseTables: TablaStructor<D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>) {
+export default function <D extends string>(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>) {
     return new Database<D>(databaseTables, getDatabase) as IDatabase<D>;
 }
 const watchers: IWatcher<any, string>[] = [];
@@ -16,19 +16,17 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
         this.removeWatch = () => watchers.splice(watchers.findIndex(x => x == this), 1);
         this.tableName = tableName;
     }
-
 }
-
-
 
 class Database<D extends string> implements IDatabase<D> {
     private dataBase: () => Promise<SQLite.WebSQLDatabase>;
-    private tables: TablaStructor<D>[];
+    private tables: TablaStructor<any, D>[];
     private timeout: any = undefined;
     private static dbIni: boolean = false;
 
     private db?: SQLite.WebSQLDatabase;
-    constructor(databaseTables: TablaStructor<D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>) {
+    constructor(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>) {
+
         this.dataBase = async () => {
             if (!this.db === undefined)
                 this.db = await getDatabase();
@@ -133,8 +131,9 @@ class Database<D extends string> implements IDatabase<D> {
         if (table)
             table.columns.filter(x => x.isUique === true).forEach(x => {
                 var anyItem = item as any;
-                if (anyItem[x.columnName] !== undefined && anyItem[x.columnName] !== null) {
-                    filter[x.columnName] = trimValue(anyItem[x.columnName]);
+                var columnName = x.columnName as string
+                if (anyItem[columnName] !== undefined && anyItem[columnName] !== null) {
+                    filter[columnName] = trimValue(anyItem[columnName]);
                     addedisUique = true;
                 }
             });
@@ -213,8 +212,9 @@ class Database<D extends string> implements IDatabase<D> {
         var tItems = Array.isArray(items) ? items : [items];
         for (var item of tItems) {
             await this.localDelete(item);
-            await this.triggerWatch(item, "onDelete", undefined, tableName);
+            await this.triggerWatch(tItems, "onDelete", undefined, tableName);
         }
+        
     }
 
     async where<T>(tableName: D, query?: any | T) {
@@ -258,10 +258,11 @@ class Database<D extends string> implements IDatabase<D> {
                                 if (!item || !booleanColumns || booleanColumns.length <= 0)
                                     return item;
                                 booleanColumns.forEach(column => {
-                                    if (item[column.columnName] != undefined && item[column.columnName] != null) {
-                                        if (item[column.columnName] === 0 || item[column.columnName] === "0" || item[column.columnName] === false)
-                                            item[column.columnName] = false;
-                                        else item[column.columnName] = true;
+                                    var columnName = column.columnName as string
+                                    if (item[columnName] != undefined && item[columnName] != null) {
+                                        if (item[columnName] === 0 || item[columnName] === "0" || item[columnName] === false)
+                                            item[columnName] = false;
+                                        else item[columnName] = true;
                                     }
 
                                 })
@@ -336,7 +337,7 @@ class Database<D extends string> implements IDatabase<D> {
     //#endregion
 
     //#region TableSetup
-    public tableHasChanges = async (item: TablaStructor<D>) => {
+    public async tableHasChanges<T>(item: TablaStructor<T, D>) {
         var appSettingsKeys = await this.allowedKeys(item.tableName);
         return appSettingsKeys.filter(x => x != "id").length != item.columns.filter(x => x.columnName != "id").length || item.columns.filter(x => x.columnName != "id" && !appSettingsKeys.find(a => a == x.columnName)).length > 0;
     }

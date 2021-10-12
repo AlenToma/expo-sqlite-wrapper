@@ -28,13 +28,13 @@ export class Parent extends IBaseModule<TableNames>{
  }
  
   static GetTableStructor() {
-    return new TableStructor(
+    return new TableStructor<Parent, TableNames>(
       "Parents",
       [
-        { columnName: "id", columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
-        { columnName: "name", columnType: ColumnType.String },
+        { columnName: x=> x.id, columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
+        { columnName: x=> x.name, columnType: ColumnType.String },
         //isUique acts as an Id too as the library will chack if there exist an item with the same field value and will update instead.
-         { columnName: "email", columnType: ColumnType.String, isUique: true } 
+         { columnName: x=> x.email, columnType: ColumnType.String, isUique: true } 
       ]
     )
   }
@@ -51,15 +51,15 @@ export class Child extends IBaseModule<TableNames>{
  }
  
   static GetTableStructor() {
-    return new TableStructor(
+    return new TableStructor<Child, TableNames>(
       "Childrens",
       [
-        { columnName: "id", columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
-        { columnName: "name", columnType: ColumnType.String },
-        { columnName: "parentId", columnType: ColumnType.Number, nullable: true },
+        { columnName: x=> x.id, columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
+        { columnName: x=> .name, columnType: ColumnType.String },
+        { columnName: x=> x.parentId, columnType: ColumnType.Number, nullable: true },
       ],
        [
-        { contraintTableName: "Parents", contraintColumnName: "id", columnName: "parentId" }
+        { contraintTableName: "Parents", contraintColumnName: "id", columnName: x=> x.parentId }
       ]
     )
   }
