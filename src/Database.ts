@@ -29,15 +29,23 @@ class Database<D extends string> implements IDatabase<D> {
     private db?: SQLite.WebSQLDatabase;
     public isClosed?: boolean;
     private working: boolean;
+    private isClosing: boolean;
+    private isOpen: boolean;
+    private timer: any;
     constructor(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>) {
         this.onInit = onInit;
         this.working = false;
+        this.isClosing = false;
+        this.timer = undefined;
         this.dataBase = async () => {
+            while (this.isClosing)
+                await this.wait();
             if (this.db === undefined || this.isClosed) {
                 this.db = await getDatabase();
                 this.isClosed = false;
                 await this.onInit?.(this);
             }
+            this.isOpen = true;
             return this.db ?? await getDatabase();
         };
         this.tables = databaseTables;
@@ -53,8 +61,10 @@ class Database<D extends string> implements IDatabase<D> {
         this.working = true;
     }
 
-    private unlock() {
+    private async unlock() {
         this.working = false;
+        if (this.isClosing)
+            await this.wait();
     }
 
     private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", subOperation?: Operation, tableName?: D) {
@@ -173,18 +183,29 @@ class Database<D extends string> implements IDatabase<D> {
         return single(((await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName))).map((x: any) => { x.tableName = item.tableName; return x; })) as T | undefined
     }
 
-    private wait() {
-        return new Promise<void>((resolve, reject) => setTimeout(resolve, 1000));
+    private wait(ms?: number) {
+        return new Promise<void>((resolve, reject) => setTimeout(resolve, ms ?? 100));
     }
 
     //#endregion
 
     //#region public Methods for Select
 
+    startRefresher(ms: number, dbName: string) {
+        if (this.timer)
+            clearInterval(this.timer);
+        this.timer = setInterval(async () => {
+            if (this.isClosing || this.isClosed)
+                return;
+            console.info("db refresh:", await this.tryToClose(dbName));
+        }, ms)
+    }
+
     public async tryToClose(name: string) {
         try {
 
-
+            if (!this.db || !this.isOpen)
+                return false;
 
             if (name === undefined || name == "")
                 throw "Cant close the database, name cant be undefined"
@@ -205,18 +226,29 @@ class Database<D extends string> implements IDatabase<D> {
                 console.log("Could not find (ExponentSQLite or ExponentSQLite.close) in NativeModulesProxy in expo-modules-core")
                 return false;
             }
-            while (this.isLocked()) {
-                console.log("The database is locked", "waiting for it to unlock");
-                await this.wait();
+
+            const repeate = await this.isLocked();
+            while (await this.isLocked()) {
+
+                await this.wait(1000);
             }
+            if (repeate) {
+                console.log("Cannot close, The database is locked", "Try another time");
+                return false; // wait to close the db another time
+
+            }
+            this.isClosing = true;
             await ExponentSQLite.close(name);
-            this.isClosed = true;
-            this.db = undefined;
             return true;
         } catch (e) {
             if (console.error)
                 console.error(e);
             return false;
+        } finally {
+            this.isOpen = false;
+            this.isClosed = true;
+            this.db = undefined;
+            this.isClosing = false;
         }
     }
 
@@ -234,13 +266,11 @@ class Database<D extends string> implements IDatabase<D> {
                                 if (data.rows.item(i).name != 'id')
                                     keys.push(data.rows.item(i).name);
                             }
-                            this.unlock();
-                            resolve(keys);
+                            this.unlock().then(x => resolve(keys));
                         },
                     ),
                 (error) => {
-                    this.unlock();
-                    reject(error);
+                    this.unlock().then(x => reject(error));
                 },
             );
         }) as Promise<string[]>;
@@ -328,7 +358,7 @@ class Database<D extends string> implements IDatabase<D> {
                         args,
                         async (trans, data) => {
                             var booleanColumns = this.tables.find(x => x.tableName == tableName)?.columns.filter(x => x.columnType == ColumnType.Boolean);
-                            console.log('query executed:' + query);
+                            console.info('query executed:', query);
                             const translateKeys = (item: any) => {
                                 if (!item || !booleanColumns || booleanColumns.length <= 0)
                                     return item;
@@ -350,14 +380,11 @@ class Database<D extends string> implements IDatabase<D> {
                                     item.tableName = tableName;
                                 items.push(translateKeys(item));
                             }
-                            this.unlock();
-                            resolve(items);
+                            this.unlock().then(x => resolve(items))
                         },
                         (_ts, error) => {
-                            console.log('Could not execute query:' + query);
-                            console.log(error);
-                            this.unlock();
-                            reject(error);
+                            console.error('Could not execute query:', query, error);
+                            this.unlock().then(x => reject(error));
                             return false;
                         },
                     );
@@ -365,8 +392,7 @@ class Database<D extends string> implements IDatabase<D> {
                 (error) => {
                     console.log('Could not execute query:' + query);
                     console.log(error);
-                    this.unlock();
-                    reject(error);
+                    this.unlock().then(x => reject(error))
                 },
             );
         }) as Promise<IBaseModule<D>[]>;
@@ -376,11 +402,13 @@ class Database<D extends string> implements IDatabase<D> {
         this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).exec(queries, readOnly, (error, result) => {
-                this.unlock();
-                if (error) {
-                    console.log("SQL Error", error);
-                    reject(error);
-                } else resolve();
+                this.unlock().then(() => {
+                    if (error) {
+                        console.log("SQL Error", error);
+                        reject(error);
+                    } else resolve();
+                });
+
             })
         }) as Promise<void>;
     }
@@ -390,43 +418,19 @@ class Database<D extends string> implements IDatabase<D> {
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).transaction(
                 (tx) => {
-                    clearTimeout(this.timeout)
-                    this.timeout = setTimeout(() => {
-                        console.log("timed out")
-                        this.unlock();
-                        reject("Query Timeout");
-                    }, 2000);
-                    console.log('Execute Query:' + query);
-                    tx.executeSql(
-                        query,
-                        args,
-                        (tx, results) => {
-                            console.log('Statment has been executed....' + query);
-                            clearTimeout(this.timeout);
-                            this.unlock();
-                            resolve(true);
-                        },
-                        (_ts, error) => {
-                            console.log('Could not execute query');
-                            console.log(args);
-                            console.log(error);
-                            this.unlock();
-                            reject(error);
-                            clearTimeout(this.timeout)
-                            return false;
-                        },
-                    );
+                    console.log('Executing Query:' + query);
+                    tx.executeSql(query, args);
                 },
                 (error) => {
-                    console.log('db executing statement, has been termineted');
-                    console.log(args);
-                    console.log(error);
-                    this.unlock();
+                    console.error('Could not execute query:', query, args, error);
+                    this.unlock().then(() => reject(error))
                     reject(error);
-                    clearTimeout(this.timeout)
-                    throw 'db executing statement, has been termineted';
                 },
-            );
+                () => {
+                    console.log('Statment has been executed....' + query);
+                    clearTimeout(this.timeout);
+                    this.unlock().then(() => resolve(true));
+                });
         }) as Promise<boolean>;
     };
 

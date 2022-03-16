@@ -125,4 +125,7 @@ export interface IDatabase<D extends string> {
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
     tableHasChanges: <T>(item: TablaStructor<T, D>) => Promise<boolean>;
     executeRawSql: (queries: SqlLite.Query[], readOnly: boolean) => Promise<void>;
+    // close and open the db every ms.
+    // the db will be able to refresh only if there is no db operation is ongoing
+    startRefresher: (ms: number, dbName: string)=> void;
 }

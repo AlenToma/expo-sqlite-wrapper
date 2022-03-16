@@ -174,7 +174,7 @@ interface IQuery<T, D extends string> {
     LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>;
     // load object
     LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>
-    // Delete based on Query
+    // Delete based on Query, this will create Delete from 
     delete: ()=> Promise<void>;
     // get the first item or undefined
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
