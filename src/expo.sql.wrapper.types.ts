@@ -58,6 +58,10 @@ export enum Param {
     EndWith = "E#like",
     EqualAndGreaterThen = '#>=',
     EqualAndLessThen = '#<=',
+    OrderByDesc= "#Order By #C DESC",
+    OrderByAsc= "#Order By #C ASC",
+    Limit = "#Limit #Counter",
+
 }
 
 export interface IQuaryResult<D extends string> {
@@ -85,6 +89,9 @@ export interface IQuery<T, D extends string> {
     NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
     NotNull: () => IQuery<T, D>;
+    OrderByDesc: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
+    OrderByAsc: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
+    Limit: (value: number) => IQuery<T, D>;
     LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>;
     LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;

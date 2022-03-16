@@ -4,8 +4,9 @@
   "description": "This is an ORM, build around expo-sqlite. It will make operation like UPDATE,SELECT AND INSERT a lot easier to handle",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "mocha dist/tests/test.js",
+    "dev": "npm run build & npm run test"
   },
   "keywords": [
     "sql",
@@ -36,6 +37,8 @@
   },
   "devDependencies": {
     "@types/node": "^17.0.21",
-    "typescript": "*"
+    "typescript": "*",
+    "mocha": "^9.2.2",
+    "should": "^13.2.3"
   }
 }

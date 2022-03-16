@@ -157,7 +157,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         this.Queries.push({ queryValue: value });
     }
 
-    
+
     private validate() {
         var totalLoob = this.Queries.length;
         for (var i = 0; i < totalLoob; i++) {
@@ -324,6 +324,23 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
+    OrderByAsc<B>(item: string | ((x: T) => B)) {
+        this.Queries.push(Param.OrderByAsc)
+        this.Queries.push("function " + item.toString());
+        return this;
+    }
+
+    OrderByDesc<B>(item: string | ((x: T) => B)) {
+        this.Queries.push(Param.OrderByDesc)
+        this.Queries.push("function " + item.toString());
+        return this;
+    }
+
+    Limit(value: number) {
+        this.validateValue(value, Param.Limit);
+        return this;
+    }
+
     LoadChildren<B>(childTableName: D, parentProperty: ((x: T) => B) | string) {
         var item = {
             parentProperty: getColumns("function " + parentProperty.toString()),
@@ -357,9 +374,20 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
     getQueryResult() {
         this.validate();
+        var addWhere = false;
+        for (var i = 0; i < this.Queries.length; i++) {
+            const x = this.Queries[i];
+            if (x == Param.Limit || x == Param.OrderByAsc || x == Param.OrderByDesc) {
+                i++;
+                continue;
+            } else {
+                addWhere = true;
+                break;
+            }
 
+        }
         var result = {
-            sql: `SELECT * FROM ${this.tableName} ${this.Queries.length > 0 ? ' WHERE ' : ''}`,
+            sql: `SELECT * FROM ${this.tableName} ${addWhere ? ' WHERE ' : ''}`,
             values: [],
             children: this.Children,
         } as IQuaryResult<D>;
@@ -388,6 +416,13 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     appendSql(value);
                     break;
 
+                case Param.OrderByAsc:
+                case Param.OrderByDesc:
+                    appendSql(value.toString().substring(1).replace("#C", getColumns(this.getValue())));
+                    break;
+                case Param.Limit:
+                    appendSql(value.toString().substring(1).replace("#Counter", this.getValue().queryValue));
+                    break;
                 case Param.Contains:
                 case Param.StartWith:
                 case Param.EndWith:
@@ -429,7 +464,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return result;
     }
 
-    
+
     async firstOrDefault() {
         var item = this.getQueryResult();
         console.log("Execute firstOrDefault:" + item.sql)
