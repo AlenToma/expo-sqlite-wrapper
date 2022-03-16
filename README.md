@@ -185,6 +185,9 @@ interface IQuery<T, D extends string> {
 ### IDatabase
 ```js
 export interface IDatabase<D extends string> {
+    isClosed?: boolean,
+    // Its importend that,createDbContext return new data database after this is triggered
+    tryToClose: (name: string) => Promise<boolean>,
     // the columns for the current table
     allowedKeys: (tableName: D) => Promise<string[]>;
     // convert object to IQueryResultItem
