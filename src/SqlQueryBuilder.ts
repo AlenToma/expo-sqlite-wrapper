@@ -101,27 +101,27 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
     //#region private methods
 
-    private hasNext() {
-        return this.Queries.length > 0 && this.currentIndex < this.Queries.length;
+    private hasNext(queries: any[]) {
+        return queries.length > 0 && this.currentIndex < queries.length;
     }
 
-    private prevValue() {
-        if (this.currentIndex > 1) return this.Queries[this.currentIndex - 2];
+    private prevValue(queries: any[]) {
+        if (this.currentIndex > 1) return queries[this.currentIndex - 2];
         return undefined;
     }
 
-    private nextValue() {
-        return this.Queries.length > 0 ? this.Queries[this.currentIndex] : undefined;
+    private nextValue(queries: any[]) {
+        return queries.length > 0 ? queries[this.currentIndex] : undefined;
     }
 
-    private getLast() {
-        if (this.Queries.length > 0) return this.Queries[this.Queries.length - 1];
+    private getLast(queries: any[]) {
+        if (queries.length > 0) return queries[queries.length - 1];
         return undefined;
     }
 
     private cleanLast() {
         var value = undefined as any;
-        while ((value = this.getLast()) != undefined) {
+        while ((value = this.getLast(this.Queries)) != undefined) {
             if (
                 value != Param.AND &&
                 value != Param.StartParameter &&
@@ -133,9 +133,9 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         }
     }
 
-    private getValue() {
-        var item = this.Queries[this.currentIndex];
-        if (this.hasNext()) this.currentIndex++;
+    private getValue(queries: any[]) {
+        var item = queries[this.currentIndex];
+        if (this.hasNext(queries)) this.currentIndex++;
         return item;
     }
 
@@ -166,10 +166,10 @@ export class Query<T, D extends string> implements IQuery<T, D>{
             this.currentIndex = 0;
             let breakit;
 
-            while (this.hasNext()) {
-                var pValue = this.prevValue();
-                var value = this.getValue();
-                var next = this.nextValue();
+            while (this.hasNext(this.Queries)) {
+                var pValue = this.prevValue(this.Queries);
+                var value = this.getValue(this.Queries);
+                var next = this.nextValue(this.Queries);
                 switch (value) {
                     case Param.EqualTo:
                     case Param.OR:
@@ -369,14 +369,26 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
 
+    getQueryResult(operation?: "SELECT" | "DELETE") {
+        if (!operation)
+            operation = "SELECT";
 
-
-
-    getQueryResult() {
         this.validate();
+        var queries = [] as any[];
+        if (operation === "DELETE") {
+            for (var i = 0; i < this.Queries.length; i++) {
+                const x = this.Queries[i];
+                if ((x == Param.Limit || x == Param.OrderByAsc || x == Param.OrderByDesc)) {
+                    i++;
+                    continue;
+                }
+
+                queries.push(x);
+            }
+        } else queries = [...this.Queries]
         var addWhere = false;
-        for (var i = 0; i < this.Queries.length; i++) {
-            const x = this.Queries[i];
+        for (var i = 0; i < queries.length; i++) {
+            const x = queries[i];
             if (x == Param.Limit || x == Param.OrderByAsc || x == Param.OrderByDesc) {
                 i++;
                 continue;
@@ -387,7 +399,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
         }
         var result = {
-            sql: `SELECT * FROM ${this.tableName} ${addWhere ? ' WHERE ' : ''}`,
+            sql: `${operation} ${operation == "SELECT" ? "* " : ""}FROM ${this.tableName} ${addWhere ? ' WHERE ' : ''}`,
             values: [],
             children: this.Children,
         } as IQuaryResult<D>;
@@ -397,7 +409,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         };
 
         const translate = (value: any) => {
-            var pValue = this.prevValue();
+            var pValue = this.prevValue(queries);
             switch (value) {
                 case Param.StartParameter:
                 case Param.EqualTo:
@@ -407,6 +419,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                 case Param.LessThan:
                 case Param.GreaterThan:
                 case Param.IN:
+                case Param.NotIn:
                 case Param.NotEqualTo:
                 case Param.NotNULL:
                 case Param.NULL:
@@ -418,10 +431,10 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
                 case Param.OrderByAsc:
                 case Param.OrderByDesc:
-                    appendSql(value.toString().substring(1).replace("#C", getColumns(this.getValue())));
+                    appendSql(value.toString().substring(1).replace("#C", getColumns(this.getValue(queries))));
                     break;
                 case Param.Limit:
-                    appendSql(value.toString().substring(1).replace("#Counter", this.getValue().queryValue));
+                    appendSql(value.toString().substring(1).replace("#Counter", this.getValue(queries).queryValue));
                     break;
                 case Param.Contains:
                 case Param.StartWith:
@@ -457,13 +470,18 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                 }
             }
         };
-        while (this.hasNext()) {
-            translate(this.getValue());
+        while (this.hasNext(queries)) {
+            translate(this.getValue(queries));
         }
         this.currentIndex = 0;
         return result;
     }
 
+    async delete() {
+        var item = this.getQueryResult("DELETE");
+        console.log("Execute delete:" + item.sql)
+        await this.database.execute(item.sql, item.values);
+    }
 
     async firstOrDefault() {
         var item = this.getQueryResult();
@@ -486,7 +504,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
     async toList() {
         var item = this.getQueryResult();
-        var result = [];
+        var result = [] as IQueryResultItem<T, D>[];
         for (var x of await this.database.find(item.sql, item.values, this.tableName)) {
             x.tableName = this.tableName;
             result.push(await createQueryResultType<T, D>(x, this.database, this.Children));

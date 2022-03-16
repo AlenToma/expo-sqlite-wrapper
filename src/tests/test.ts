@@ -18,6 +18,29 @@ const item = {
     id: 1
 } as Test
 
+mocha.describe("DeleteWthLimit", function () {
+
+    var q = new Query<Test, TableName>("Test", database);
+
+    q.Limit(100).OrderByAsc(x=> x.name).getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test")
+});
+
+
+mocha.describe("DeleteWithSearch", function () {
+
+    var q = new Query<Test, TableName>("Test", database);
+
+    q.Start().Column(x=> x.id).EqualTo(50).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id = ? )")
+});
+
+mocha.describe("DeleteWithSearchNotIn", function () {
+
+    var q = new Query<Test, TableName>("Test", database);
+
+    q.Start().Column(x=> x.id).NotIn([10,2]).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
+});
+
+
 mocha.describe("LimitTest", function () {
 
     var q = new Query<Test, TableName>("Test", database);

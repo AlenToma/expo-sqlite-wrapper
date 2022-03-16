@@ -28,8 +28,10 @@ class Database<D extends string> implements IDatabase<D> {
     private onInit?: (database: IDatabase<D>) => Promise<void>;
     private db?: SQLite.WebSQLDatabase;
     public isClosed?: boolean;
+    private working: boolean;
     constructor(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>) {
         this.onInit = onInit;
+        this.working = false;
         this.dataBase = async () => {
             if (this.db === undefined || this.isClosed) {
                 this.db = await getDatabase();
@@ -42,6 +44,18 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     //#region private methods
+
+    private isLocked() {
+        return this.working === true;
+    }
+
+    private lock() {
+        this.working = true;
+    }
+
+    private unlock() {
+        this.working = false;
+    }
 
     private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", subOperation?: Operation, tableName?: D) {
         var tItems = Array.isArray(items) ? items : [items];
@@ -114,11 +128,10 @@ class Database<D extends string> implements IDatabase<D> {
         }) as Promise<T | undefined>;
     }
 
-    private async localDelete(item: any, tableName?: string) {
-        validateTableName(item, tableName);
-        tableName = item.tableName ?? tableName;
-        var q = `DELETE FROM ${tableName} WHERE id=?`;
-        await this.execute(q, [item.id]);
+    private async localDelete(items: IBaseModule<D>[], tableName: string) {
+        var q = `DELETE FROM ${tableName} WHERE id IN (${items.map(x => "?").join(",")})`;
+        await this.execute(q, items.map(x => x.id));
+
     }
 
     private async getUique(item: IBaseModule<D>) {
@@ -160,12 +173,19 @@ class Database<D extends string> implements IDatabase<D> {
         return single(((await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName))).map((x: any) => { x.tableName = item.tableName; return x; })) as T | undefined
     }
 
+    private wait() {
+        return new Promise<void>((resolve, reject) => setTimeout(resolve, 1000));
+    }
+
     //#endregion
 
     //#region public Methods for Select
 
     public async tryToClose(name: string) {
         try {
+
+
+
             if (name === undefined || name == "")
                 throw "Cant close the database, name cant be undefined"
             if (typeof require === 'undefined') {
@@ -185,6 +205,10 @@ class Database<D extends string> implements IDatabase<D> {
                 console.log("Could not find (ExponentSQLite or ExponentSQLite.close) in NativeModulesProxy in expo-modules-core")
                 return false;
             }
+            while (this.isLocked()) {
+                console.log("The database is locked", "waiting for it to unlock");
+                await this.wait();
+            }
             await ExponentSQLite.close(name);
             this.isClosed = true;
             this.db = undefined;
@@ -197,6 +221,7 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     public allowedKeys = (tableName: D) => {
+        this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).readTransaction(
                 (x) =>
@@ -209,10 +234,12 @@ class Database<D extends string> implements IDatabase<D> {
                                 if (data.rows.item(i).name != 'id')
                                     keys.push(data.rows.item(i).name);
                             }
+                            this.unlock();
                             resolve(keys);
                         },
                     ),
                 (error) => {
+                    this.unlock();
                     reject(error);
                 },
             );
@@ -247,10 +274,19 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     async delete(items: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) {
-        var tItems = Array.isArray(items) ? items : [items];
-        for (var item of tItems) {
-            await this.localDelete(item);
-            await this.triggerWatch(tItems, "onDelete", undefined, tableName);
+        var tItems = (Array.isArray(items) ? items : [items]).reduce((v, c) => {
+            validateTableName(c, tableName);
+            if (v[c.tableName])
+                v[c.tableName].push(c);
+            else v[c.tableName] = [c];
+
+            return v;
+        }, {} as any);
+
+
+        for (var key of Object.keys(tItems)) {
+            await this.localDelete(tItems[key], key);
+            await this.triggerWatch(tItems[key], "onDelete", undefined, tableName);
         }
 
     }
@@ -282,6 +318,7 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     async find(query: string, args?: any[], tableName?: string) {
+        this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).readTransaction(
                 async (x) => {
@@ -313,11 +350,13 @@ class Database<D extends string> implements IDatabase<D> {
                                     item.tableName = tableName;
                                 items.push(translateKeys(item));
                             }
+                            this.unlock();
                             resolve(items);
                         },
                         (_ts, error) => {
                             console.log('Could not execute query:' + query);
                             console.log(error);
+                            this.unlock();
                             reject(error);
                             return false;
                         },
@@ -326,6 +365,7 @@ class Database<D extends string> implements IDatabase<D> {
                 (error) => {
                     console.log('Could not execute query:' + query);
                     console.log(error);
+                    this.unlock();
                     reject(error);
                 },
             );
@@ -333,8 +373,10 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     executeRawSql = async (queries: SQLite.Query[], readOnly: boolean) => {
+        this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).exec(queries, readOnly, (error, result) => {
+                this.unlock();
                 if (error) {
                     console.log("SQL Error", error);
                     reject(error);
@@ -344,12 +386,14 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     execute = async (query: string, args?: any[]) => {
+        this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).transaction(
                 (tx) => {
                     clearTimeout(this.timeout)
                     this.timeout = setTimeout(() => {
                         console.log("timed out")
+                        this.unlock();
                         reject("Query Timeout");
                     }, 2000);
                     console.log('Execute Query:' + query);
@@ -358,13 +402,15 @@ class Database<D extends string> implements IDatabase<D> {
                         args,
                         (tx, results) => {
                             console.log('Statment has been executed....' + query);
-                            clearTimeout(this.timeout)
+                            clearTimeout(this.timeout);
+                            this.unlock();
                             resolve(true);
                         },
                         (_ts, error) => {
                             console.log('Could not execute query');
                             console.log(args);
                             console.log(error);
+                            this.unlock();
                             reject(error);
                             clearTimeout(this.timeout)
                             return false;
@@ -375,6 +421,7 @@ class Database<D extends string> implements IDatabase<D> {
                     console.log('db executing statement, has been termineted');
                     console.log(args);
                     console.log(error);
+                    this.unlock();
                     reject(error);
                     clearTimeout(this.timeout)
                     throw 'db executing statement, has been termineted';

@@ -166,10 +166,16 @@ interface IQuery<T, D extends string> {
     NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
     NotNull: () => IQuery<T, D>;
+    OrderByDesc: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
+    OrderByAsc: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
+    Limit: (value: number) => IQuery<T, D>;
+
     // Load array
     LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>;
     // load object
     LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B)|string) => IChildQueryLoader<B, T, D>
+    // Delete based on Query
+    delete: ()=> Promise<void>;
     // get the first item or undefined
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     // Try to find the Queried item if not found then insert item and return it from the database.
