@@ -1,13 +1,11 @@
 # expo-sqlite-wrapper
- This is a wrapper for `expo-sqlite` as it make it very easy to create,update and work with the database file
+ This is an ORM, build around `expo-sqlite`. It will make operation like UPDATE,SELECT AND INSERT a lot easier to handle
  
  ## Installations
 ```sh
- npm install expo-sqlite
- npm install expo-sqlite-wrapper
+ npm install expo-sqlite expo-sqlite-wrapper
 ```
 Installation for `expo-sqlite` read https://docs.expo.dev/versions/latest/sdk/sqlite/
-
 
 ## Usage
 ### SetupModules
