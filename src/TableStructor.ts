@@ -24,10 +24,11 @@ export interface IColumnStructor<T> {
 
 export default class TableStructor<T, D extends string> {
     tableName: D;
+    onItemCreate?: (item: T) => T;
     columns: IColumnStructor<T>[];
     constraints?: IConstraint<T, D>[];
 
-    constructor(tableName: D, columns: IColumnStructor<T>[], constraint?: IConstraint<T, D>[]) {
+    constructor(tableName: D, columns: IColumnStructor<T>[], constraint?: IConstraint<T, D>[], onItemCreate?: (item: T) => T) {
         columns.forEach(x => {
             x.columnName = getColumns(x.columnName);
         });
@@ -35,7 +36,7 @@ export default class TableStructor<T, D extends string> {
         constraint?.forEach(x => {
             x.columnName = getColumns(x.columnName);
         });
-
+        this.onItemCreate = onItemCreate;
         this.tableName = tableName;
         this.columns = columns;
         this.constraints = constraint;

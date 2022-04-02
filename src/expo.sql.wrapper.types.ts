@@ -94,7 +94,7 @@ export interface IQuery<T, D extends string> {
     Limit: (value: number) => IQuery<T, D>;
     LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>;
     LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>
-    delete: ()=> Promise<void>;
+    delete: () => Promise<void>;
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
     toList: () => Promise<IQueryResultItem<T, D>[]>;
@@ -112,6 +112,11 @@ export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new data database after this is triggered
     tryToClose: (name: string) => Promise<boolean>,
+    // Auto close the db after every ms.
+    // The db will be able to refresh only if there is no db operation is ongoing.
+    // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time.
+    // its best to use ms:3600000
+    startRefresher: (ms: number, dbName: string) => void;
     allowedKeys: (tableName: D) => Promise<string[]>;
     asQueryable: <T>(item: T & IBaseModule<D>, tableName?: D) => Promise<IQueryResultItem<T, D>>
     watch: <T>(tableName: D) => IWatcher<T, D>;
@@ -125,7 +130,5 @@ export interface IDatabase<D extends string> {
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
     tableHasChanges: <T>(item: TablaStructor<T, D>) => Promise<boolean>;
     executeRawSql: (queries: SqlLite.Query[], readOnly: boolean) => Promise<void>;
-    // close and open the db every ms.
-    // the db will be able to refresh only if there is no db operation is ongoing
-    startRefresher: (ms: number, dbName: string)=> void;
+
 }

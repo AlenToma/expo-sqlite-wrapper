@@ -191,7 +191,7 @@ class Database<D extends string> implements IDatabase<D> {
 
     //#region public Methods for Select
 
-    startRefresher(ms: number, dbName: string) {
+    public startRefresher(ms: number, dbName: string) {
         if (this.timer)
             clearInterval(this.timer);
         this.timer = setInterval(async () => {
@@ -357,7 +357,8 @@ class Database<D extends string> implements IDatabase<D> {
                         query,
                         args,
                         async (trans, data) => {
-                            var booleanColumns = this.tables.find(x => x.tableName == tableName)?.columns.filter(x => x.columnType == ColumnType.Boolean);
+                            const table = this.tables.find(x => x.tableName == tableName);
+                            const booleanColumns = table?.columns.filter(x => x.columnType == ColumnType.Boolean);
                             console.info('query executed:', query);
                             const translateKeys = (item: any) => {
                                 if (!item || !booleanColumns || booleanColumns.length <= 0)
@@ -378,7 +379,8 @@ class Database<D extends string> implements IDatabase<D> {
                                 var item = data.rows.item(i);
                                 if (tableName)
                                     item.tableName = tableName;
-                                items.push(translateKeys(item));
+                                const translatedItem = translateKeys(item);
+                                items.push((table && table.onItemCreate ? table.onItemCreate(translatedItem) : translatedItem));
                             }
                             this.unlock().then(x => resolve(items))
                         },

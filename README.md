@@ -40,25 +40,32 @@ export class Parent extends IBaseModule<TableNames>{
 
 
 export class Child extends IBaseModule<TableNames>{
- someFiel: string;
+ someField: string;
  parentId?: number;
- constructor(someFiel:string, parentId?: number ){
+ constructor(someField:string, parentId?: number ){
    super("Childrens");
-   this.someFiel = someFiel;
+   this.someField = someField;
    this.parentId = parentId;
  }
- 
+  
   static GetTableStructor() {
     return new TableStructor<Child, TableNames>(
       "Childrens",
       [
         { columnName: x=> x.id, columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
-        { columnName: x=> .name, columnType: ColumnType.String },
+        { columnName: x=> x.someField, columnType: ColumnType.String },
         { columnName: x=> x.parentId, columnType: ColumnType.Number, nullable: true },
       ],
        [
         { contraintTableName: "Parents", contraintColumnName: "id", columnName: x=> x.parentId }
-      ]
+      ], 
+      // You could always handle how the item gets created when its returned from the database.
+      // The database return a json item, if you want to convert it to class then use this(onItemCreate) to generate the class
+      (item: T)=> {
+           var child= new Child(item.someField, item.parentId);
+           child.id= item.id;
+           return child;
+      } 
     )
   }
 }
@@ -192,6 +199,10 @@ export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new data database after this is triggered
     tryToClose: (name: string) => Promise<boolean>,
+    // Auto close the db after every ms.
+    // The db will be able to refresh only if there is no db operation is ongoing.
+    // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time
+    startRefresher: (ms: number, dbName: string) => void;
     // the columns for the current table
     allowedKeys: (tableName: D) => Promise<string[]>;
     // convert object to IQueryResultItem
