@@ -106,7 +106,10 @@ class Database<D extends string> implements IDatabase<D> {
                 let query = '';
                 let args = [] as any[];
                 if (uiqueItem) {
-                    if (insertOnly) return;
+                    if (insertOnly) {
+                        resolve(item as any);
+                        return;
+                    }
                     query = `UPDATE ${item.tableName} SET `;
                     keys.forEach((k, i) => {
                         query += ` ${k}=? ` + (i < keys.length - 1 ? ',' : '');
@@ -126,6 +129,8 @@ class Database<D extends string> implements IDatabase<D> {
                 keys.forEach((k: string, i) => {
                     args.push((item as any)[k] ?? null);
                 });
+                if (uiqueItem)
+                    item.id = uiqueItem.id;
                 if (uiqueItem != undefined)
                     args.push(uiqueItem.id);
                 await this.execute(query, args);
