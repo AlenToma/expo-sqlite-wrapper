@@ -122,7 +122,7 @@ export interface IDatabase<D extends string> {
     watch: <T>(tableName: D) => IWatcher<T, D>;
     query: <T>(tableName: D) => IQuery<T, D>;
     find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>
-    save: <T>(item: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D) => Promise<T[]>;
+    save: <T>(item: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) => Promise<T[]>;
     where: <T>(tableName: D, query?: any | T) => Promise<T[]>;
     delete: (item: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) => Promise<void>;
     execute: (query: string, args?: any[]) => Promise<boolean>;

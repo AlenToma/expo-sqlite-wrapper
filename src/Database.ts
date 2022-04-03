@@ -21,6 +21,7 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
 }
 
 class Database<D extends string> implements IDatabase<D> {
+    private mappedKeys: Map<D, string[]>;
     private dataBase: () => Promise<SQLite.WebSQLDatabase>;
     private tables: TablaStructor<any, D>[];
     private timeout: any = undefined;
@@ -34,6 +35,7 @@ class Database<D extends string> implements IDatabase<D> {
     private timer: any;
     constructor(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>) {
         this.onInit = onInit;
+        this.mappedKeys = new Map<D, string[]>();
         this.working = false;
         this.isClosing = false;
         this.timer = undefined;
@@ -89,7 +91,7 @@ class Database<D extends string> implements IDatabase<D> {
         }
     }
 
-    private localSave<T>(item?: IBaseModule<D>, insertOnly?: Boolean, tableName?: D) {
+    private localSave<T>(item?: IBaseModule<D>, insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
         return new Promise(async (resolve, reject) => {
             try {
                 if (!item) {
@@ -98,8 +100,8 @@ class Database<D extends string> implements IDatabase<D> {
                 }
                 validateTableName(item, tableName);
                 console.log('Executing Save...');
-                var uiqueItem = await this.getUique(item);
-                var keys = (await this.allowedKeys(item.tableName)).filter((x) => Object.keys(item).includes(x));
+                const uiqueItem = await this.getUique(item);
+                const keys = (await this.allowedKeys(item.tableName, true)).filter((x) => Object.keys(item).includes(x));
                 await this.triggerWatch(item, "onSave", uiqueItem ? "UPDATE" : "INSERT", tableName);
                 let query = '';
                 let args = [] as any[];
@@ -127,9 +129,11 @@ class Database<D extends string> implements IDatabase<D> {
                 if (uiqueItem != undefined)
                     args.push(uiqueItem.id);
                 await this.execute(query, args);
-                var lastItem = ((await this.selectLastRecord<IBaseModule<D>>(item)) ?? item);
-                item.id = lastItem.id;
-                resolve(lastItem as any as T);
+                if (saveAndForget !== true || (item.id === 0 || item.id === undefined)) {
+                    const lastItem = ((await this.selectLastRecord<IBaseModule<D>>(item)) ?? item);
+                    item.id = lastItem.id;
+                    resolve(lastItem as any as T);
+                } else resolve(item as any as T);
             } catch (error) {
                 console.log(error);
                 console.log(item)
@@ -252,7 +256,9 @@ class Database<D extends string> implements IDatabase<D> {
         }
     }
 
-    public allowedKeys = (tableName: D) => {
+    public allowedKeys = async (tableName: D, fromCachedKyes?: boolean) => {
+        if (fromCachedKyes === true && this.mappedKeys.has(tableName))
+            return this.mappedKeys.get(tableName);
         this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).readTransaction(
@@ -266,6 +272,7 @@ class Database<D extends string> implements IDatabase<D> {
                                 if (data.rows.item(i).name != 'id')
                                     keys.push(data.rows.item(i).name);
                             }
+                            this.mappedKeys.set(tableName, keys);
                             this.unlock().then(x => resolve(keys));
                         },
                     ),
@@ -294,11 +301,11 @@ class Database<D extends string> implements IDatabase<D> {
         return ((new Query<T, D>(tableName, db)) as IQuery<T, D>);
     }
 
-    public async save<T>(items: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D) {
+    public async save<T>(items: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
         var tItems = Array.isArray(items) ? items : [items];
         var returnItem = [] as T[];
         for (var item of tItems) {
-            returnItem.push(await this.localSave<T>(item) ?? item as any);
+            returnItem.push(await this.localSave<T>(item, insertOnly, tableName, saveAndForget) ?? item as any);
         }
         return returnItem as T[];
     }
