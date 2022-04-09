@@ -164,19 +164,19 @@ class Database<D extends string> implements IDatabase<D> {
         }
 
         var filter = {} as any;
-        var addedisUique = false;
+        var addedisUnique = false;
         var table = this.tables.find(x => x.tableName === item.tableName);
         if (table)
-            table.columns.filter(x => x.isUique === true).forEach(x => {
+            table.columns.filter(x => x.isUnique === true).forEach(x => {
                 var anyItem = item as any;
                 var columnName = x.columnName as string
                 if (anyItem[columnName] !== undefined && anyItem[columnName] !== null) {
                     filter[columnName] = trimValue(anyItem[columnName]);
-                    addedisUique = true;
+                    addedisUnique = true;
                 }
             });
 
-        if (!addedisUique)
+        if (!addedisUnique)
             return undefined;
 
         return single<IBaseModule<D>>(await this.where<IBaseModule<D>>(item.tableName, filter));

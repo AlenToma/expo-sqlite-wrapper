@@ -18,7 +18,7 @@ export interface IColumnStructor<T> {
     columnName: string | ((x: T) => any);
     isPrimary?: boolean;
     autoIncrement?: boolean;
-    isUique?: boolean;
+    isUnique?: boolean;
 }
 
 

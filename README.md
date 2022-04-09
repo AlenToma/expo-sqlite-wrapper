@@ -31,8 +31,8 @@ export class Parent extends IBaseModule<TableNames>{
       [
         { columnName: x=> x.id, columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
         { columnName: x=> x.name, columnType: ColumnType.String },
-        //isUique acts as an Id too as the library will chack if there exist an item with the same field value and will update instead.
-         { columnName: x=> x.email, columnType: ColumnType.String, isUique: true } 
+        //isUnique acts as an Id too as the library will chack if there exist an item with the same field value and will update instead.
+         { columnName: x=> x.email, columnType: ColumnType.String, isUnique: true } 
       ]
     )
   }
@@ -213,7 +213,7 @@ export interface IDatabase<D extends string> {
     // start a Query
     query: <T>(tableName: D) => IQuery<T, D>;
     find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>
-    // insert or update depends on Id or isUique columns
+    // insert or update depends on Id or isUnique columns
     save: <T>(item?: IBaseModule<D> | (IBaseModule<D>[]), insertOnly?: Boolean, tableName?: D) => Promise<T[]>;
     where: <T>(tableName: D, query?: any | T) => Promise<T[]>;
     // delete an item, there is no check for contraint values, so make sure you do that befor you delete the item
