@@ -234,7 +234,7 @@ export interface IDatabase<D extends string> {
 If you use obfuscator-io-metro-plugin and use IQuery expression eg `Column(x=> x.name)`
 then you should have those settings below. as the obfuscator will rewite all properties and the library can not read those.
 
-```
+```json
 const jsoMetroPlugin = require("obfuscator-io-metro-plugin")(
   {
     compact: false,
