@@ -10,6 +10,7 @@ Installation for `expo-sqlite` read https://docs.expo.dev/versions/latest/sdk/sq
 ## Usage
 ### SetupModules
 ```js
+"show source" // this is only specific for hermes installations, read below to understand more about this.
 import  { IBaseModule, TableStructor, ColumnType, IQueryResultItem } from 'expo-sqlite-wrapper'
 export type TableNames = "Parents" | "Childrens";
 
