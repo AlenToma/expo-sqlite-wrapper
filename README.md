@@ -258,7 +258,8 @@ const jsoMetroPlugin = require("obfuscator-io-metro-plugin")(
 ```
 
 ## Hermes
-If you are using hermes and using expression ex `x=> x.id` then you will have too add `show source` on top of the files.
+If you are using hermes and using expression ex `x=> x.id` then you will have too add `show source` on top of the files where you are using it.
+Its best to gather all the queries in a one class and add `show source` on top of this specific class, eg repository and the db classes on the example above.
 
 
 Otherwise if you still want to use more advanced obfuscator settings then you should use `Column("name")` 
