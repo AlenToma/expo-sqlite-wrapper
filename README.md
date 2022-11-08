@@ -95,7 +95,7 @@ export default class DbContext {
   database: IDatabase<TableNames>;
   constructor() {
  this.database = createDbContext<TableNames>(tables, async () => {
-      return SQLite.openDatabase(this.databaseName) as any
+      return SQLite.openDatabase(this.databaseName)
     }, async (db) => {
       try {
         for (let sql of `
