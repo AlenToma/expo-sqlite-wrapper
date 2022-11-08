@@ -199,7 +199,7 @@ interface IQuery<T, D extends string> {
 export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new data database after this is triggered
-    tryToClose: (name: string) => Promise<boolean>,
+    tryToClose: () => Promise<boolean>,
     close:()=> Prmoise<void>,
     // save and delete method begintransaction if beginTransaction not executed and there is more then one item
     beginTransaction:()=> Promise<void>;
@@ -211,7 +211,7 @@ export interface IDatabase<D extends string> {
     // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time.
     // its best to use ms:3600000
     // the db has to be ideal for ms to be able to close it.
-    startRefresher: (ms: number, dbName: string) => void;
+    startRefresher: (ms: number) => void;
     // the columns for the current table
     allowedKeys: (tableName: D) => Promise<string[]>;
     // convert object to IQueryResultItem
