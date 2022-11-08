@@ -4,8 +4,8 @@ import TablaStructor, { ColumnType } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 
 
-export default function <D extends string>(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>) {
-    return new Database<D>(databaseTables, getDatabase, onInit) as IDatabase<D>;
+export default function <D extends string>(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
+    return new Database<D>(databaseTables, getDatabase, onInit, disableLog) as IDatabase<D>;
 }
 
 const watchers: IWatcher<any, string>[] = [];
@@ -19,6 +19,8 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
         this.tableName = tableName;
     }
 }
+
+
 
 class Database<D extends string> implements IDatabase<D> {
     private mappedKeys: Map<D, string[]>;
@@ -34,8 +36,13 @@ class Database<D extends string> implements IDatabase<D> {
     private timer: any;
     private transacting: boolean;
     private operations: Map<string, boolean>;
-    private refresherSettings?: { ms: number, dbName: string } | undefined;
-    constructor(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>) {
+    private refresherSettings?: { ms: number } | undefined;
+    private disableLog?: boolean;
+    constructor(databaseTables: TablaStructor<any, D>[],
+        getDatabase: () => Promise<SQLite.WebSQLDatabase>,
+        onInit?: (database: IDatabase<D>) => Promise<void>,
+        disableLog?: boolean) {
+        this.disableLog = disableLog;
         this.onInit = onInit;
         this.mappedKeys = new Map<D, string[]>();
         this.isClosing = false;
@@ -56,14 +63,22 @@ class Database<D extends string> implements IDatabase<D> {
         this.tables = databaseTables;
     }
 
+    private log(...items: any[]) {
+        if (!this.disableLog)
+            this.log(items);
+    }
 
+    private info(...items: any[]) {
+        if (!this.disableLog)
+            this.info(items);
+    }
 
     //#region private methods
 
 
     private resetRefresher() {
         if (this.refresherSettings) {
-            this.startRefresher(this.refresherSettings.ms, this.refresherSettings.dbName);
+            this.startRefresher(this.refresherSettings.ms);
         }
     }
 
@@ -105,7 +120,7 @@ class Database<D extends string> implements IDatabase<D> {
 
 
                 this.operations.set(key, true);
-                console.log('Executing Save...');
+                this.log('Executing Save...');
                 const uiqueItem = await this.getUique(item);
                 const keys = (await this.allowedKeys(item.tableName, true)).filter((x) => Object.keys(item).includes(x));
                 await this.triggerWatch(item, "onSave", uiqueItem ? "UPDATE" : "INSERT", tableName);
@@ -151,8 +166,7 @@ class Database<D extends string> implements IDatabase<D> {
                     this.operations.delete(key);
                 }
             } catch (error) {
-                console.log(error);
-                console.log(item)
+                console.error(error, item);
                 reject(error);
                 this.operations.delete(key);
             }
@@ -171,7 +185,7 @@ class Database<D extends string> implements IDatabase<D> {
     private async getUique(item: IBaseModule<D>) {
         if (item.id != undefined && item.id > 0)
             return single<IBaseModule<D>>(await this.where<IBaseModule<D>>(item.tableName, { id: item.id }));
-        console.log('Executing getUique...');
+        this.log('Executing getUique...');
         const trimValue = (value: any) => {
             if (typeof value === "string")
                 return (value as string).trim();
@@ -198,10 +212,9 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     private async selectLastRecord<T>(item: IBaseModule<D>) {
-        console.log('Executing SelectLastRecord... ');
+        this.log('Executing SelectLastRecord... ');
         if (!item.tableName) {
-            console.log('TableName cannot be empty for:');
-            console.log(item);
+            this.log('TableName cannot be empty for:', item);
             return;
         }
         return single(((await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName))).map((x: any) => { x.tableName = item.tableName; return x; })) as T | undefined
@@ -219,7 +232,7 @@ class Database<D extends string> implements IDatabase<D> {
         this.resetRefresher();
         if (this.transacting)
             return;
-        console.info("creating transaction");
+        this.info("creating transaction");
         await this.execute("begin transaction");
         this.transacting = true;
     }
@@ -228,7 +241,7 @@ class Database<D extends string> implements IDatabase<D> {
         this.resetRefresher();
         if (!this.transacting)
             return;
-        console.info("commiting transaction");
+        this.info("commiting transaction");
         await this.execute("commit");
         this.transacting = false;
     }
@@ -237,29 +250,40 @@ class Database<D extends string> implements IDatabase<D> {
         this.resetRefresher();
         if (!this.transacting)
             return;
-        console.info("rollback transaction");
+        this.info("rollback transaction");
         await this.execute("rollback");
         this.transacting = false;
     }
 
-    public startRefresher(ms: number, dbName: string) {
+    public startRefresher(ms: number) {
         if (this.timer)
             clearInterval(this.timer);
-        this.refresherSettings = { ms, dbName };
+        this.refresherSettings = { ms };
         this.timer = setInterval(async () => {
             if (this.isClosing || this.isClosed)
                 return;
-            console.info("db refresh:", await this.tryToClose(dbName));
+            this.info("db refresh:", await this.tryToClose());
         }, ms)
     }
 
-    public async tryToClose(name: string) {
+    public async close() {
+        const db = this.db as any;
+        if (db && db.closeAsync != undefined) {
+            await db.closeAsync();
+            this.isOpen = false;
+            this.isClosed = true;
+            this.db = undefined;
+            this.isClosing = false;
+        }
+    }
+
+    public async tryToClose() {
         let r = false;
         try {
             const db = this.db as any;
             if (!this.db || !this.isOpen)
                 return false;
-            if (name === undefined || name == "" || db.closeAsync === undefined)
+            if (db.closeAsync === undefined)
                 throw "Cant close the database, name cant be undefined"
 
             if (this.isLocked() || this.operations.size > 0)
@@ -270,8 +294,7 @@ class Database<D extends string> implements IDatabase<D> {
             r = true;
             return true;
         } catch (e) {
-            if (console.error)
-                console.error(e);
+            console.error(e);
             return false;
         } finally {
             if (r) {
@@ -328,11 +351,12 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     public async save<T>(items: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
-        let throwError = !this.isLocked();
+        const tItems = Array.isArray(items) ? items : [items];
+        let throwError = !this.isLocked() && tItems.length > 1;
         try {
             if (throwError)
                 await this.beginTransaction();
-            var tItems = Array.isArray(items) ? items : [items];
+
             var returnItem = [] as T[];
             for (var item of tItems) {
                 returnItem.push(await this.localSave<T>(item, insertOnly, tableName, saveAndForget) ?? item as any);
@@ -412,14 +436,14 @@ class Database<D extends string> implements IDatabase<D> {
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).readTransaction(
                 async (x) => {
-                    console.log('Executing Find..');
+                    this.log('Executing Find..');
                     x.executeSql(
                         query,
                         args,
                         async (trans, data) => {
                             const table = this.tables.find(x => x.tableName == tableName);
                             const booleanColumns = table?.columns.filter(x => x.columnType == ColumnType.Boolean);
-                            console.info('query executed:', query);
+                            this.info('query executed:', query);
                             const translateKeys = (item: any) => {
                                 if (!item || !booleanColumns || booleanColumns.length <= 0)
                                     return item;
@@ -454,8 +478,7 @@ class Database<D extends string> implements IDatabase<D> {
                     );
                 },
                 (error) => {
-                    console.log('Could not execute query:' + query);
-                    console.log(error);
+                    console.error('Could not execute query:', query, error);
                     this.operations.delete(key);
                     reject(error)
                 },
@@ -470,7 +493,7 @@ class Database<D extends string> implements IDatabase<D> {
             (await this.dataBase()).exec(queries, readOnly, (error, result) => {
                 this.operations.delete(key);
                 if (error) {
-                    console.log("SQL Error", error);
+                    console.error("SQL Error", error);
                     reject(error);
                 } else resolve();
 
@@ -484,7 +507,7 @@ class Database<D extends string> implements IDatabase<D> {
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).transaction(
                 (tx) => {
-                    console.log('Executing Query:' + query);
+                    this.info('Executing Query:' + query);
                     tx.executeSql(query, args);
                 },
                 (error) => {
@@ -493,7 +516,7 @@ class Database<D extends string> implements IDatabase<D> {
                     reject(error);
                 },
                 () => {
-                    console.log('Statment has been executed....' + query);
+                    this.info('Statment has been executed....', query);
                     clearTimeout(this.timeout);
                     this.operations.delete(key)
                     resolve(true);
@@ -519,7 +542,7 @@ class Database<D extends string> implements IDatabase<D> {
             await this.setUpDataBase(true);
             await this.commitTransaction();
         } catch (e) {
-            console.log(e)
+            console.error(e)
             this.rollbackTransaction();
         }
     };
@@ -535,9 +558,9 @@ class Database<D extends string> implements IDatabase<D> {
                         return "REAL";
                     return "TEXT";
                 }
-                console.log(`dbIni= ${Database.dbIni}`);
-                console.log(`forceCheck= ${forceCheck}`);
-                console.log("initilize database table setup");
+                this.log(`dbIni= ${Database.dbIni}`);
+                this.log(`forceCheck= ${forceCheck}`);
+                this.log("initilize database table setup");
                 for (var table of this.tables) {
                     var query = `CREATE TABLE if not exists ${table.tableName} (`;
                     table.columns.forEach((col, index) => {
