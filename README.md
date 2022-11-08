@@ -74,7 +74,8 @@ export class Child extends IBaseModule<TableNames>{
 ```
 
 ### Setup dbContexts
-```js
+
+```ts
 import createDbContext, { IDatabase, IQueryResultItem, IBaseModule } from 'expo-sqlite-wrapper'
 import * as SQLite from 'expo-sqlite';
 const tables = [Parent.GetTableStructor(), Child.GetTableStructor()]
@@ -88,6 +89,7 @@ export default class DbContext {
 ```
 
 ### More advanced setup dbContexts with refresher
+```ts
 export default class DbContext {
   databaseName: string = "mydatabase.db";
   database: IDatabase<TableNames>;
