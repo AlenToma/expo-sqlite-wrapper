@@ -113,7 +113,7 @@ export default class DbContext {
       } finally {
         db.startRefresher(3600000);
       }
-    }, true);
+    }, !__DEV__);
   }
 }
 ```
