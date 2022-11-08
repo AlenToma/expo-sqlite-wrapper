@@ -87,6 +87,36 @@ export default class DbContext {
 }
 ```
 
+### More advanced setup dbContexts with refresher
+export default class DbContext {
+  databaseName: string = "mydatabase.db";
+  database: IDatabase<TableNames>;
+  constructor() {
+ this.database = createDbContext<TableNames>(tables, async () => {
+      return SQLite.openDatabase(this.databaseName) as any
+    }, async (db) => {
+      try {
+        for (let sql of `
+      PRAGMA cache_size=8192;
+      PRAGMA encoding="UTF-8";
+      PRAGMA synchronous=NORMAL;
+      PRAGMA temp_store=FILE;
+      `.split(";").filter(x=> x.length>2).map(x => {
+          return { sql: x, args: [] }
+        })) {
+          await db.executeRawSql([sql], false);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        db.startRefresher(3600000);
+      }
+    }, true);
+  }
+}
+```
+
+
 ### Using the dbContexts
 ```js
 const dbContext = new DbContext();
