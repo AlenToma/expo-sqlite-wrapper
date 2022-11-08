@@ -200,6 +200,7 @@ export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new data database after this is triggered
     tryToClose: (name: string) => Promise<boolean>,
+    close:()=> Prmoise<void>,
     // save and delete method begintransaction if beginTransaction not executed and there is more then one item
     beginTransaction:()=> Promise<void>;
     commitTransaction:()=> Promise<void>;
