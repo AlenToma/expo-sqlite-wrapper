@@ -10,6 +10,7 @@ Installation for `expo-sqlite` read https://docs.expo.dev/versions/latest/sdk/sq
 ## Usage
 ### SetupModules
 ```js
+"show source" // this is only specific for hermes installations, read below to understand more about this.
 import  { IBaseModule, TableStructor, ColumnType, IQueryResultItem } from 'expo-sqlite-wrapper'
 export type TableNames = "Parents" | "Childrens";
 
@@ -199,7 +200,6 @@ export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new data database after this is triggered
     tryToClose: (name: string) => Promise<boolean>,
-    
     // save and delete method begin trsnsacton if beginTransaction not executed 
     beginTransaction:()=> Promise<void>;
     commitTransaction:()=> Promise<void>;
@@ -238,15 +238,11 @@ export interface IDatabase<D extends string> {
     tableHasChanges: (item: TablaStructor<D>) => Promise<boolean>;
 }
 ```
-### Hermes enabled
-If you use expression eg x=> x.name for example, then you will have to mark the file with  "show source"
-for more info see https://github.com/facebook/hermes/issues/114#issuecomment-887106990
-
-### Lastly
+### obfuscator-io-metro-plugin
 If you use obfuscator-io-metro-plugin and use IQuery expression eg `Column(x=> x.name)`
 then you should have those settings below. as the obfuscator will rewite all properties and the library can not read those.
 
-```
+```js
 const jsoMetroPlugin = require("obfuscator-io-metro-plugin")(
   {
     compact: false,
@@ -268,6 +264,11 @@ const jsoMetroPlugin = require("obfuscator-io-metro-plugin")(
 );
 
 ```
+
+## Hermes
+If you are using hermes and using expression ex `x=> x.id` then you will have too add `show source` on top of the files where you are using it.
+Its best to gather all the queries in a one class and add `show source` on top of this specific class, eg repository and the db classes on the example above.
+
 
 Otherwise if you still want to use more advanced obfuscator settings then you should use `Column("name")` 
 instead of expression `x=> x.name` as the library could still read the string and count it as a column.
