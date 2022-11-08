@@ -199,9 +199,17 @@ export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new data database after this is triggered
     tryToClose: (name: string) => Promise<boolean>,
+    
+    // save and delete method begin trsnsacton if beginTransaction not executed 
+    beginTransaction:()=> Promise<void>;
+    commitTransaction:()=> Promise<void>;
+    rollbackTransaction:()=> Promise<void>;
+
     // Auto close the db after every ms.
     // The db will be able to refresh only if there is no db operation is ongoing.
-    // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time
+    // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time.
+    // its best to use ms:3600000
+    // the db has to be ideal for ms to be able to close it.
     startRefresher: (ms: number, dbName: string) => void;
     // the columns for the current table
     allowedKeys: (tableName: D) => Promise<string[]>;
@@ -230,6 +238,10 @@ export interface IDatabase<D extends string> {
     tableHasChanges: (item: TablaStructor<D>) => Promise<boolean>;
 }
 ```
+### Hermes enabled
+If you use expression eg x=> x.name for example, then you will have to mark the file with  "show source"
+for more info see https://github.com/facebook/hermes/issues/114#issuecomment-887106990
+
 ### Lastly
 If you use obfuscator-io-metro-plugin and use IQuery expression eg `Column(x=> x.name)`
 then you should have those settings below. as the obfuscator will rewite all properties and the library can not read those.

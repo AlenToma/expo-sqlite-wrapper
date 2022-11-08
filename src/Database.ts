@@ -29,16 +29,19 @@ class Database<D extends string> implements IDatabase<D> {
     private onInit?: (database: IDatabase<D>) => Promise<void>;
     private db?: SQLite.WebSQLDatabase;
     public isClosed?: boolean;
-    private working: boolean;
     private isClosing: boolean;
     private isOpen: boolean;
     private timer: any;
+    private transacting: boolean;
+    private operations: Map<string, boolean>;
+    private refresherSettings?: { ms: number, dbName: string } | undefined;
     constructor(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>) {
         this.onInit = onInit;
         this.mappedKeys = new Map<D, string[]>();
-        this.working = false;
         this.isClosing = false;
         this.timer = undefined;
+        this.transacting = false;
+        this.operations = new Map();
         this.dataBase = async () => {
             while (this.isClosing)
                 await this.wait();
@@ -53,20 +56,19 @@ class Database<D extends string> implements IDatabase<D> {
         this.tables = databaseTables;
     }
 
+
+
     //#region private methods
 
+
+    private resetRefresher() {
+        if (this.refresherSettings) {
+            this.startRefresher(this.refresherSettings.ms, this.refresherSettings.dbName);
+        }
+    }
+
     private isLocked() {
-        return this.working === true;
-    }
-
-    private lock() {
-        this.working = true;
-    }
-
-    private async unlock() {
-        this.working = false;
-        if (this.isClosing)
-            await this.wait();
+        return this.transacting === true;
     }
 
     private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", subOperation?: Operation, tableName?: D) {
@@ -92,13 +94,17 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     private localSave<T>(item?: IBaseModule<D>, insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
+        validateTableName(item, tableName);
+        const key = "localSave" + item.tableName;
         return new Promise(async (resolve, reject) => {
             try {
                 if (!item) {
                     reject(undefined);
                     return;
                 }
-                validateTableName(item, tableName);
+
+
+                this.operations.set(key, true);
                 console.log('Executing Save...');
                 const uiqueItem = await this.getUique(item);
                 const keys = (await this.allowedKeys(item.tableName, true)).filter((x) => Object.keys(item).includes(x));
@@ -134,22 +140,31 @@ class Database<D extends string> implements IDatabase<D> {
                 if (uiqueItem != undefined)
                     args.push(uiqueItem.id);
                 await this.execute(query, args);
+
                 if (saveAndForget !== true || (item.id === 0 || item.id === undefined)) {
                     const lastItem = ((await this.selectLastRecord<IBaseModule<D>>(item)) ?? item);
                     item.id = lastItem.id;
                     resolve(lastItem as any as T);
-                } else resolve(item as any as T);
+                    this.operations.delete(key);
+                } else {
+                    resolve(item as any as T);
+                    this.operations.delete(key);
+                }
             } catch (error) {
                 console.log(error);
                 console.log(item)
                 reject(error);
+                this.operations.delete(key);
             }
         }) as Promise<T | undefined>;
     }
 
     private async localDelete(items: IBaseModule<D>[], tableName: string) {
+        const key = "localDelete" + tableName;
+        this.operations.set(key, true);
         var q = `DELETE FROM ${tableName} WHERE id IN (${items.map(x => "?").join(",")})`;
         await this.execute(q, items.map(x => x.id));
+        this.operations.delete(key);
 
     }
 
@@ -200,9 +215,37 @@ class Database<D extends string> implements IDatabase<D> {
 
     //#region public Methods for Select
 
+    public async beginTransaction() {
+        this.resetRefresher();
+        if (this.transacting)
+            return;
+        console.info("creating transaction");
+        await this.execute("begin transaction");
+        this.transacting = true;
+    }
+
+    public async commitTransaction() {
+        this.resetRefresher();
+        if (!this.transacting)
+            return;
+        console.info("commiting transaction");
+        await this.execute("commit");
+        this.transacting = false;
+    }
+
+    public async rollbackTransaction() {
+        this.resetRefresher();
+        if (!this.transacting)
+            return;
+        console.info("rollback transaction");
+        await this.execute("rollback");
+        this.transacting = false;
+    }
+
     public startRefresher(ms: number, dbName: string) {
         if (this.timer)
             clearInterval(this.timer);
+        this.refresherSettings = { ms, dbName };
         this.timer = setInterval(async () => {
             if (this.isClosing || this.isClosed)
                 return;
@@ -211,60 +254,38 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     public async tryToClose(name: string) {
+        let r = false;
         try {
-
+            const db = this.db as any;
             if (!this.db || !this.isOpen)
                 return false;
-
-            if (name === undefined || name == "")
+            if (name === undefined || name == "" || db.closeAsync === undefined)
                 throw "Cant close the database, name cant be undefined"
-            if (typeof require === 'undefined') {
-                console.log("require is undefined");
+
+            if (this.isLocked() || this.operations.size > 0)
                 return false;
-            }
-            //import { NativeModulesProxy } from 'expo-modules-core';
-            // const { ExponentSQLite } = NativeModulesProxy;
-            const { NativeModulesProxy } = require("expo-modules-core");
-            if (NativeModulesProxy == undefined) {
-                console.log("Could not find NativeModulesProxy in expo-modules-core")
-                return false;
-            }
 
-            const { ExponentSQLite } = NativeModulesProxy;
-            if (ExponentSQLite == undefined || ExponentSQLite.close == undefined) {
-                console.log("Could not find (ExponentSQLite or ExponentSQLite.close) in NativeModulesProxy in expo-modules-core")
-                return false;
-            }
-
-            const repeate = await this.isLocked();
-            while (await this.isLocked()) {
-
-                await this.wait(1000);
-            }
-            if (repeate) {
-                console.log("Cannot close, The database is locked", "Try another time");
-                return false; // wait to close the db another time
-
-            }
             this.isClosing = true;
-            await ExponentSQLite.close(name);
+            await db.closeAsync();
+            r = true;
             return true;
         } catch (e) {
             if (console.error)
                 console.error(e);
             return false;
         } finally {
-            this.isOpen = false;
-            this.isClosed = true;
-            this.db = undefined;
-            this.isClosing = false;
+            if (r) {
+                this.isOpen = false;
+                this.isClosed = true;
+                this.db = undefined;
+                this.isClosing = false;
+            }
         }
     }
 
     public allowedKeys = async (tableName: D, fromCachedKyes?: boolean) => {
         if (fromCachedKyes === true && this.mappedKeys.has(tableName))
             return this.mappedKeys.get(tableName);
-        this.lock();
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).readTransaction(
                 (x) =>
@@ -278,11 +299,11 @@ class Database<D extends string> implements IDatabase<D> {
                                     keys.push(data.rows.item(i).name);
                             }
                             this.mappedKeys.set(tableName, keys);
-                            this.unlock().then(x => resolve(keys));
+                            resolve(keys)
                         },
                     ),
                 (error) => {
-                    this.unlock().then(x => reject(error));
+                    reject(error)
                 },
             );
         }) as Promise<string[]>;
@@ -307,28 +328,54 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     public async save<T>(items: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
-        var tItems = Array.isArray(items) ? items : [items];
-        var returnItem = [] as T[];
-        for (var item of tItems) {
-            returnItem.push(await this.localSave<T>(item, insertOnly, tableName, saveAndForget) ?? item as any);
+        let throwError = !this.isLocked();
+        try {
+            if (throwError)
+                await this.beginTransaction();
+            var tItems = Array.isArray(items) ? items : [items];
+            var returnItem = [] as T[];
+            for (var item of tItems) {
+                returnItem.push(await this.localSave<T>(item, insertOnly, tableName, saveAndForget) ?? item as any);
+            }
+            if (throwError)
+                await this.commitTransaction();
+            return returnItem as T[];
+        } catch (e) {
+            console.error(e);
+            if (throwError)
+                await this.rollbackTransaction();
+            throw e;
         }
-        return returnItem as T[];
     }
 
     async delete(items: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) {
-        var tItems = (Array.isArray(items) ? items : [items]).reduce((v, c) => {
-            validateTableName(c, tableName);
-            if (v[c.tableName])
-                v[c.tableName].push(c);
-            else v[c.tableName] = [c];
+        let throwError = !this.isLocked();
+        try {
+            if (throwError)
+                await this.beginTransaction();
+            var tItems = (Array.isArray(items) ? items : [items]).reduce((v, c) => {
+                validateTableName(c, tableName);
+                if (v[c.tableName])
+                    v[c.tableName].push(c);
+                else v[c.tableName] = [c];
 
-            return v;
-        }, {} as any);
+                return v;
+            }, {} as any);
 
 
-        for (var key of Object.keys(tItems)) {
-            await this.localDelete(tItems[key], key);
-            await this.triggerWatch(tItems[key], "onDelete", undefined, tableName);
+            for (let key of Object.keys(tItems)) {
+                await this.localDelete(tItems[key], key);
+                await this.triggerWatch(tItems[key], "onDelete", undefined, tableName);
+            }
+
+            if (throwError)
+                await this.commitTransaction();
+
+        } catch (e) {
+            console.error(e);
+            if (throwError)
+                await this.rollbackTransaction();
+            throw e;
         }
 
     }
@@ -360,7 +407,8 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     async find(query: string, args?: any[], tableName?: string) {
-        this.lock();
+        const key = query + tableName;
+        this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).readTransaction(
                 async (x) => {
@@ -394,41 +442,45 @@ class Database<D extends string> implements IDatabase<D> {
                                 const translatedItem = translateKeys(item);
                                 items.push((table && table.onItemCreate ? table.onItemCreate(translatedItem) : translatedItem));
                             }
-                            this.unlock().then(x => resolve(items))
+                            this.operations.delete(key);
+                            resolve(items);
                         },
                         (_ts, error) => {
                             console.error('Could not execute query:', query, error);
-                            this.unlock().then(x => reject(error));
-                            return false;
+                            reject(error)
+                            this.operations.delete(key);
+                            return false
                         },
                     );
                 },
                 (error) => {
                     console.log('Could not execute query:' + query);
                     console.log(error);
-                    this.unlock().then(x => reject(error))
+                    this.operations.delete(key);
+                    reject(error)
                 },
             );
         }) as Promise<IBaseModule<D>[]>;
     }
 
     executeRawSql = async (queries: SQLite.Query[], readOnly: boolean) => {
-        this.lock();
+        const key = "executeRawSql" + JSON.stringify(queries);
+        this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).exec(queries, readOnly, (error, result) => {
-                this.unlock().then(() => {
-                    if (error) {
-                        console.log("SQL Error", error);
-                        reject(error);
-                    } else resolve();
-                });
+                this.operations.delete(key);
+                if (error) {
+                    console.log("SQL Error", error);
+                    reject(error);
+                } else resolve();
 
             })
         }) as Promise<void>;
     }
 
     execute = async (query: string, args?: any[]) => {
-        this.lock();
+        const key = "execute" + query;
+        this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).transaction(
                 (tx) => {
@@ -437,13 +489,14 @@ class Database<D extends string> implements IDatabase<D> {
                 },
                 (error) => {
                     console.error('Could not execute query:', query, args, error);
-                    this.unlock().then(() => reject(error))
+                    this.operations.delete(key)
                     reject(error);
                 },
                 () => {
                     console.log('Statment has been executed....' + query);
                     clearTimeout(this.timeout);
-                    this.unlock().then(() => resolve(true));
+                    this.operations.delete(key)
+                    resolve(true);
                 });
         }) as Promise<boolean>;
     };
@@ -458,42 +511,57 @@ class Database<D extends string> implements IDatabase<D> {
 
 
     public dropTables = async () => {
-        for (var x of this.tables) {
-            await this.execute(`DROP TABLE if exists ${x.tableName}`);
+        try {
+            this.beginTransaction();
+            for (var x of this.tables) {
+                await this.execute(`DROP TABLE if exists ${x.tableName}`);
+            }
+            await this.setUpDataBase(true);
+            await this.commitTransaction();
+        } catch (e) {
+            console.log(e)
+            this.rollbackTransaction();
         }
-        await this.setUpDataBase(true);
     };
 
     setUpDataBase = async (forceCheck?: boolean) => {
-        if (!Database.dbIni || forceCheck) {
-            const dbType = (columnType: ColumnType) => {
-                if (columnType == ColumnType.Boolean || columnType == ColumnType.Number)
-                    return "INTEGER";
-                if (columnType == ColumnType.Decimal)
-                    return "REAL";
-                return "TEXT";
-            }
-            console.log(`dbIni= ${Database.dbIni}`);
-            console.log(`forceCheck= ${forceCheck}`);
-            console.log("initilize database table setup");
-            for (var table of this.tables) {
-                var query = `CREATE TABLE if not exists ${table.tableName} (`;
-                table.columns.forEach((col, index) => {
-                    query += `${col.columnName} ${dbType(col.columnType)} ${!col.nullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
-                });
-                table.columns.filter(x => x.isPrimary === true).forEach((col, index) => {
-                    query += `PRIMARY KEY(${col.columnName} ${col.autoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.columns.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");
-                });
-
-                if (table.constraints && table.constraints.length > 0) {
-                    query += ",";
-                    table.constraints.forEach((col, index) => {
-                        query += `CONSTRAINT "fk_${col.columnName}" FOREIGN KEY(${col.columnName}) REFERENCES ${col.contraintTableName}(${col.contraintColumnName})` + (index < (table.constraints?.length ?? 0) - 1 ? ",\n" : "\n");
-                    });
+        try {
+            if (!Database.dbIni || forceCheck) {
+                await this.beginTransaction();
+                const dbType = (columnType: ColumnType) => {
+                    if (columnType == ColumnType.Boolean || columnType == ColumnType.Number)
+                        return "INTEGER";
+                    if (columnType == ColumnType.Decimal)
+                        return "REAL";
+                    return "TEXT";
                 }
-                query += ");";
-                await this.execute(query);
+                console.log(`dbIni= ${Database.dbIni}`);
+                console.log(`forceCheck= ${forceCheck}`);
+                console.log("initilize database table setup");
+                for (var table of this.tables) {
+                    var query = `CREATE TABLE if not exists ${table.tableName} (`;
+                    table.columns.forEach((col, index) => {
+                        query += `${col.columnName} ${dbType(col.columnType)} ${!col.nullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
+                    });
+                    table.columns.filter(x => x.isPrimary === true).forEach((col, index) => {
+                        query += `PRIMARY KEY(${col.columnName} ${col.autoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.columns.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");
+                    });
+
+                    if (table.constraints && table.constraints.length > 0) {
+                        query += ",";
+                        table.constraints.forEach((col, index) => {
+                            query += `CONSTRAINT "fk_${col.columnName}" FOREIGN KEY(${col.columnName}) REFERENCES ${col.contraintTableName}(${col.contraintColumnName})` + (index < (table.constraints?.length ?? 0) - 1 ? ",\n" : "\n");
+                        });
+                    }
+                    query += ");";
+                    await this.execute(query);
+                }
+                await this.commitTransaction();
             }
+
+        } catch (e) {
+            console.error(e);
+            await this.rollbackTransaction();
         }
     }
 
