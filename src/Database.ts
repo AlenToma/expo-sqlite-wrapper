@@ -65,12 +65,12 @@ class Database<D extends string> implements IDatabase<D> {
 
     private log(...items: any[]) {
         if (!this.disableLog)
-            this.log(items);
+            console.log(items);
     }
 
     private info(...items: any[]) {
         if (!this.disableLog)
-            this.info(items);
+        console.info(items);
     }
 
     //#region private methods
@@ -301,8 +301,8 @@ class Database<D extends string> implements IDatabase<D> {
                 this.isOpen = false;
                 this.isClosed = true;
                 this.db = undefined;
-                this.isClosing = false;
             }
+            this.isClosing = false;
         }
     }
 
