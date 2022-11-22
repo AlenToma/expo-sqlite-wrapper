@@ -1,5 +1,5 @@
 # expo-sqlite-wrapper
- This is an ORM, build around `expo-sqlite`. It will make operation like UPDATE,SELECT AND INSERT a lot easier to handle
+ This is an ORM, build around `expo-sqlite`. It will make operation like `UPDATE`, `SELECT` AND `INSERT` a lot easier to handle
  
  ## Installations
 ```sh
