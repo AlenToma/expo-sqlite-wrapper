@@ -7,7 +7,7 @@ export enum ColumnType {
 }
 
 export interface IConstraint<T, D extends string> {
-    columnName: string | ((x: T) => any);
+    columnName: ((x: T) => any) | keyof T;
     contraintTableName: D;
     contraintColumnName: string;
 }
@@ -15,7 +15,7 @@ export interface IConstraint<T, D extends string> {
 export interface IColumnStructor<T> {
     columnType: ColumnType;
     nullable?: boolean;
-    columnName: string | ((x: T) => any);
+    columnName: ((x: T) => any) | keyof T;
     isPrimary?: boolean;
     autoIncrement?: boolean;
     isUnique?: boolean;

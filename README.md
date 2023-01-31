@@ -30,7 +30,7 @@ export class Parent extends IBaseModule<TableNames>{
     return new TableStructor<Parent, TableNames>(
       "Parents",
       [
-        { columnName: x=> x.id, columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
+        { columnName: "id", columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
         { columnName: x=> x.name, columnType: ColumnType.String },
         //isUnique acts as an Id too as the library will chack if there exist an item with the same field value and will update instead.
          { columnName: x=> x.email, columnType: ColumnType.String, isUnique: true } 
@@ -188,7 +188,7 @@ const addItem= async ()=> {
 ### IQuery
 ```js
 interface IQuery<T, D extends string> {
-    Column: <B>(item: ((x: T) => B)|string) => IQuery<T, D>;
+    Column: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
     Contains:  (value: StringValue) => IQuery<T, D>;
     StartWith:  (value: StringValue) => IQuery<T, D>;

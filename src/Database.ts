@@ -486,7 +486,7 @@ class Database<D extends string> implements IDatabase<D> {
         }) as Promise<IBaseModule<D>[]>;
     }
 
-    executeRawSql = async (queries: SQLite.Query[], readOnly: boolean) => {
+   executeRawSql = async (queries: SQLite.Query[], readOnly: boolean) => {
         const key = "executeRawSql" + JSON.stringify(queries);
         this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
@@ -564,16 +564,16 @@ class Database<D extends string> implements IDatabase<D> {
                 for (var table of this.tables) {
                     var query = `CREATE TABLE if not exists ${table.tableName} (`;
                     table.columns.forEach((col, index) => {
-                        query += `${col.columnName} ${dbType(col.columnType)} ${!col.nullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
+                        query += `${col.columnName.toString()} ${dbType(col.columnType)} ${!col.nullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
                     });
                     table.columns.filter(x => x.isPrimary === true).forEach((col, index) => {
-                        query += `PRIMARY KEY(${col.columnName} ${col.autoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.columns.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");
+                        query += `PRIMARY KEY(${col.columnName.toString()} ${col.autoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.columns.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");
                     });
 
                     if (table.constraints && table.constraints.length > 0) {
                         query += ",";
                         table.constraints.forEach((col, index) => {
-                            query += `CONSTRAINT "fk_${col.columnName}" FOREIGN KEY(${col.columnName}) REFERENCES ${col.contraintTableName}(${col.contraintColumnName})` + (index < (table.constraints?.length ?? 0) - 1 ? ",\n" : "\n");
+                            query += `CONSTRAINT "fk_${col.columnName.toString()}" FOREIGN KEY(${col.columnName.toString()}) REFERENCES ${col.contraintTableName}(${col.contraintColumnName})` + (index < (table.constraints?.length ?? 0) - 1 ? ",\n" : "\n");
                         });
                     }
                     query += ");";

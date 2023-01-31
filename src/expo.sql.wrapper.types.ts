@@ -19,8 +19,8 @@ export declare type StringValue = string | undefined;
 
 
 export interface IChildQueryLoader<T, B, D extends string> {
-    With: <E>(item: string | ((x: E) => any)) => IChildQueryLoader<T, B, D>;
-    AssignTo: <S, E>(item: ((x: B) => E) | string) => IQuery<B, D>;
+    With: <E>(item: ((x: E) => any) | keyof E) => IChildQueryLoader<T, B, D>;
+    AssignTo: <S, E>(item: ((x: B) => E) | keyof B) => IQuery<B, D>;
 }
 
 export interface IWatcher<T, D extends string> {
@@ -70,8 +70,9 @@ export interface IQuaryResult<D extends string> {
     children: IChildLoader<D>[];
 }
 
+
 export interface IQuery<T, D extends string> {
-    Column: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
+    Column: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
     Contains: (value: StringValue) => IQuery<T, D>;
     StartWith: (value: StringValue) => IQuery<T, D>;
@@ -89,11 +90,11 @@ export interface IQuery<T, D extends string> {
     NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
     NotNull: () => IQuery<T, D>;
-    OrderByDesc: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
-    OrderByAsc: <B>(item: ((x: T) => B) | string) => IQuery<T, D>;
+    OrderByDesc: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
+    OrderByAsc: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
     Limit: (value: number) => IQuery<T, D>;
-    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>;
-    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B) | string) => IChildQueryLoader<B, T, D>
+    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) => IChildQueryLoader<B, T, D>;
+    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) => IChildQueryLoader<B, T, D>
     delete: () => Promise<void>;
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;

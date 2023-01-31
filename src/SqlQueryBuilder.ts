@@ -55,14 +55,14 @@ class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B
         this.tableName = tableName;
     }
 
-    With<E>(item: ((x: E) => any) | string) {
+    With<E>(item: ((x: E) => any) | keyof E) {
         var child = this.parent.Children[this.parent.Children.length - 1];
         child.childProperty = getColumns("function " + item.toString()) ?? "";
         child.childTableName = this.tableName;
         return this;
     }
 
-    AssignTo<S, E>(item: ((x: B) => E) | string) {
+    AssignTo<S, E>(item: ((x: B) => E) | keyof B) {
         var child = this.parent.Children[this.parent.Children.length - 1];
         child.assignTo = getColumns("function " + item.toString()) ?? "";
         return this.parent as IQuery<B, D>;
@@ -231,7 +231,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     //#endregion
 
     //#region public Methods
-    Column<B>(item: ((x: T) => B) | string) {
+    Column<B>(item: ((x: T) => B) | keyof T) {
         this.Queries.push("function " + item.toString());
         return this;
     }
@@ -324,13 +324,13 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    OrderByAsc<B>(item: string | ((x: T) => B)) {
+    OrderByAsc<B>(item: keyof T | ((x: T) => B)) {
         this.Queries.push(Param.OrderByAsc)
         this.Queries.push("function " + item.toString());
         return this;
     }
 
-    OrderByDesc<B>(item: string | ((x: T) => B)) {
+    OrderByDesc<B>(item: keyof T | ((x: T) => B)) {
         this.Queries.push(Param.OrderByDesc)
         this.Queries.push("function " + item.toString());
         return this;
@@ -341,7 +341,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    LoadChildren<B>(childTableName: D, parentProperty: ((x: T) => B) | string) {
+    LoadChildren<B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) {
         var item = {
             parentProperty: getColumns("function " + parentProperty.toString()),
             parentTable: this.tableName,
@@ -355,7 +355,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
 
-    LoadChild<B>(childTableName: D, parentProperty: ((x: T) => B) | string) {
+    LoadChild<B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) {
         var item = {
             parentProperty: getColumns("function " + parentProperty.toString()),
             parentTable: this.tableName,
