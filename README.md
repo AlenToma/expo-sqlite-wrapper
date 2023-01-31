@@ -31,9 +31,9 @@ export class Parent extends IBaseModule<TableNames>{
       "Parents",
       [
         { columnName: "id", columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
-        { columnName: x=> x.name, columnType: ColumnType.String },
+        { columnName: "name", columnType: ColumnType.String },
         //isUnique acts as an Id too as the library will chack if there exist an item with the same field value and will update instead.
-         { columnName: x=> x.email, columnType: ColumnType.String, isUnique: true } 
+         { columnName: "email", columnType: ColumnType.String, isUnique: true } 
       ]
     )
   }
@@ -53,9 +53,9 @@ export class Child extends IBaseModule<TableNames>{
     return new TableStructor<Child, TableNames>(
       "Childrens",
       [
-        { columnName: x=> x.id, columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
-        { columnName: x=> x.someField, columnType: ColumnType.String },
-        { columnName: x=> x.parentId, columnType: ColumnType.Number, nullable: true },
+        { columnName: "id", columnType: ColumnType.Number, nullable: false, isPrimary: true, autoIncrement: true },
+        { columnName: "someField", columnType: ColumnType.String },
+        { columnName: "parentId", columnType: ColumnType.Number, nullable: true },
       ],
        [
         { contraintTableName: "Parents", contraintColumnName: "id", columnName: x=> x.parentId }
@@ -157,7 +157,7 @@ const addItem= async ()=> {
     var item = await dbContext.database.query<Parent>("Parents")
      .Start().Column(x=> x.name).IN(["name", "testName"]).End()
      .OR()
-     .Start().Column(x=> x.email).Contains("test@").End()
+     .Start().Column("email").Contains("test@").End()
      .LoadChildren("Childrens", x=> x.id)
      .With<Child>(x=> x.parentId)
      .AssignTo(x=> x.children).toList();
