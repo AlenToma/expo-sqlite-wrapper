@@ -70,7 +70,7 @@ class Database<D extends string> implements IDatabase<D> {
 
     private info(...items: any[]) {
         if (!this.disableLog)
-        console.info(items);
+            console.info(items);
     }
 
     //#region private methods
@@ -352,31 +352,20 @@ class Database<D extends string> implements IDatabase<D> {
 
     public async save<T>(items: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
         const tItems = Array.isArray(items) ? items : [items];
-        let throwError = !this.isLocked() && tItems.length > 1;
         try {
-            if (throwError)
-                await this.beginTransaction();
-
             var returnItem = [] as T[];
             for (var item of tItems) {
                 returnItem.push(await this.localSave<T>(item, insertOnly, tableName, saveAndForget) ?? item as any);
             }
-            if (throwError)
-                await this.commitTransaction();
             return returnItem as T[];
         } catch (e) {
             console.error(e);
-            if (throwError)
-                await this.rollbackTransaction();
             throw e;
         }
     }
 
     async delete(items: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) {
-        let throwError = !this.isLocked();
         try {
-            if (throwError)
-                await this.beginTransaction();
             var tItems = (Array.isArray(items) ? items : [items]).reduce((v, c) => {
                 validateTableName(c, tableName);
                 if (v[c.tableName])
@@ -392,13 +381,8 @@ class Database<D extends string> implements IDatabase<D> {
                 await this.triggerWatch(tItems[key], "onDelete", undefined, tableName);
             }
 
-            if (throwError)
-                await this.commitTransaction();
-
         } catch (e) {
             console.error(e);
-            if (throwError)
-                await this.rollbackTransaction();
             throw e;
         }
 
@@ -486,7 +470,7 @@ class Database<D extends string> implements IDatabase<D> {
         }) as Promise<IBaseModule<D>[]>;
     }
 
-   executeRawSql = async (queries: SQLite.Query[], readOnly: boolean) => {
+    executeRawSql = async (queries: SQLite.Query[], readOnly: boolean) => {
         const key = "executeRawSql" + JSON.stringify(queries);
         this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
@@ -535,22 +519,18 @@ class Database<D extends string> implements IDatabase<D> {
 
     public dropTables = async () => {
         try {
-            this.beginTransaction();
             for (var x of this.tables) {
                 await this.execute(`DROP TABLE if exists ${x.tableName}`);
             }
             await this.setUpDataBase(true);
-            await this.commitTransaction();
         } catch (e) {
             console.error(e)
-            this.rollbackTransaction();
         }
     };
 
     setUpDataBase = async (forceCheck?: boolean) => {
         try {
             if (!Database.dbIni || forceCheck) {
-                await this.beginTransaction();
                 const dbType = (columnType: ColumnType) => {
                     if (columnType == ColumnType.Boolean || columnType == ColumnType.Number)
                         return "INTEGER";
@@ -579,12 +559,10 @@ class Database<D extends string> implements IDatabase<D> {
                     query += ");";
                     await this.execute(query);
                 }
-                await this.commitTransaction();
             }
 
         } catch (e) {
             console.error(e);
-            await this.rollbackTransaction();
         }
     }
 
