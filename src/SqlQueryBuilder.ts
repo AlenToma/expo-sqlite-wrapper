@@ -2,6 +2,17 @@ import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, I
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
     result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any, false, undefined, true))[0], database) };
+    result.update = async (...keys: any[]) => {
+        if (!keys || keys.length <= 0)
+            return;
+        const kItem = { tableName: (result as any).tableName, id: (result as any).id } as IBaseModule<any>;
+        keys.forEach(k => {
+            kItem[k] = result[k];
+        });
+        await database.save<T>(kItem as any, false, undefined, true);
+        if ((result as any).id == 0 || (result as any).id === undefined)
+            (result as any).id = kItem.id;
+    }
     result.delete = async () => await database.delete(result as any);
     if (children && children.length > 0) {
         for (var x of children) {

@@ -137,7 +137,7 @@ React.useEffect(()=> {
 const addItem= async ()=> {
   var item = await dbContext.database.save(new Parent("testName", "test@gmail.com"));
   var child = await dbContext.database.save(new Child("testName",item.id));
-  // There is many different way to select
+  // There are many different way to select
   // the basic way 
   // this will be converted to [SELECT * FROM PARENTS WHERE name = ?] WHERE ? is the arguments
    var item = await dbContext.database.where<Parent>("Parents", { name: "testName"})
@@ -147,7 +147,8 @@ const addItem= async ()=> {
    .EqualTo("testName")
    .firstOrDefault();
    item.name= "test"
-   item.saveChanges();
+   await item.saveChanges();
+   // or await item.update("name") to update a single column
  
    // You could also load the children when using query
    // this will be converted to [Select * from Parents where (name in (?,?)) OR (email like %?%)] WHERE ? is the arguments.

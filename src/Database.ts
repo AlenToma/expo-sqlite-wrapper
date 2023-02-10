@@ -2,6 +2,7 @@ import { IBaseModule, IWatcher, IQuery, IDatabase, Operation } from './expo.sql.
 import { createQueryResultType, validateTableName, Query, single } from './SqlQueryBuilder'
 import TablaStructor, { ColumnType } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
+import { ResultSet } from 'expo-sqlite';
 
 
 export default function <D extends string>(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
@@ -19,8 +20,6 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
         this.tableName = tableName;
     }
 }
-
-
 
 class Database<D extends string> implements IDatabase<D> {
     private mappedKeys: Map<D, string[]>;
@@ -310,25 +309,33 @@ class Database<D extends string> implements IDatabase<D> {
         if (fromCachedKyes === true && this.mappedKeys.has(tableName))
             return this.mappedKeys.get(tableName);
         return new Promise(async (resolve, reject) => {
-            (await this.dataBase()).readTransaction(
-                (x) =>
-                    x.executeSql(
-                        `PRAGMA table_info(${tableName})`,
-                        undefined,
-                        (trans, data) => {
-                            var keys = [] as string[];
-                            for (var i = 0; i < data.rows.length; i++) {
-                                if (data.rows.item(i).name != 'id')
-                                    keys.push(data.rows.item(i).name);
-                            }
-                            this.mappedKeys.set(tableName, keys);
-                            resolve(keys)
-                        },
-                    ),
-                (error) => {
-                    reject(error)
-                },
-            );
+            (await this.dataBase()).exec([{ sql: `PRAGMA table_info(${tableName})`, args: [] }], true, (error, result) => {
+                try {
+                    if (error) {
+                        console.error(error);
+                        reject(error);
+                        return;
+                    }
+                    if (single<any>(result)?.error) {
+                        console.error(single<any>(result)?.error);
+                        reject(single<any>(result)?.error);
+                        return;
+                    }
+                    const data = result as ResultSet[]
+                    var keys = [] as string[];
+                    for (var i = 0; i < data.length; i++) {
+                        for (let r = 0; r < data[i].rows.length; r++) {
+                            if (data[i].rows[r].name != 'id')
+                                keys.push(data[i].rows[r].name);
+                        }
+                    }
+                    this.mappedKeys.set(tableName, keys);
+                    resolve(keys)
+                } catch (e) {
+                    console.error(e);
+                    reject(e);
+                }
+            });
         }) as Promise<string[]>;
     };
 
@@ -418,55 +425,50 @@ class Database<D extends string> implements IDatabase<D> {
         const key = query + tableName;
         this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
-            (await this.dataBase()).readTransaction(
-                async (x) => {
-                    this.log('Executing Find..');
-                    x.executeSql(
-                        query,
-                        args,
-                        async (trans, data) => {
-                            const table = this.tables.find(x => x.tableName == tableName);
-                            const booleanColumns = table?.columns.filter(x => x.columnType == ColumnType.Boolean);
-                            this.info('query executed:', query);
-                            const translateKeys = (item: any) => {
-                                if (!item || !booleanColumns || booleanColumns.length <= 0)
-                                    return item;
-                                booleanColumns.forEach(column => {
-                                    var columnName = column.columnName as string
-                                    if (item[columnName] != undefined && item[columnName] != null) {
-                                        if (item[columnName] === 0 || item[columnName] === "0" || item[columnName] === false)
-                                            item[columnName] = false;
-                                        else item[columnName] = true;
-                                    }
-
-                                })
-                                return item;
-                            }
-                            var items = [] as IBaseModule<D>[];
-                            for (var i = 0; i < data.rows.length; i++) {
-                                var item = data.rows.item(i);
-                                if (tableName)
-                                    item.tableName = tableName;
-                                const translatedItem = translateKeys(item);
-                                items.push((table && table.onItemCreate ? table.onItemCreate(translatedItem) : translatedItem));
-                            }
-                            this.operations.delete(key);
-                            resolve(items);
-                        },
-                        (_ts, error) => {
-                            console.error('Could not execute query:', query, error);
-                            reject(error)
-                            this.operations.delete(key);
-                            return false
-                        },
-                    );
-                },
-                (error) => {
+            this.info('executing find:', query);
+            (await this.dataBase()).exec([{ sql: query, args: args || [] }], true, (error, result) => {
+                if (error) {
                     console.error('Could not execute query:', query, error);
+                    reject(error);
                     this.operations.delete(key);
-                    reject(error)
-                },
-            );
+                    return;
+                }
+                if (single<any>(result)?.error) {
+                    console.error('Could not execute query:', query, single<any>(result)?.error);
+                    reject(single<any>(result)?.error);
+                    this.operations.delete(key);
+                    return;
+                }
+                const data = result as ResultSet[]
+                const table = this.tables.find(x => x.tableName == tableName);
+                const booleanColumns = table?.columns.filter(x => x.columnType == ColumnType.Boolean);
+                const translateKeys = (item: any) => {
+                    if (!item || !booleanColumns || booleanColumns.length <= 0)
+                        return item;
+                    booleanColumns.forEach(column => {
+                        var columnName = column.columnName as string
+                        if (item[columnName] != undefined && item[columnName] != null) {
+                            if (item[columnName] === 0 || item[columnName] === "0" || item[columnName] === false)
+                                item[columnName] = false;
+                            else item[columnName] = true;
+                        }
+
+                    })
+                    return item;
+                }
+                var items = [] as IBaseModule<D>[];
+                for (var i = 0; i < data.length; i++) {
+                    for (let r = 0; r < data[i].rows.length; r++) {
+                        const item = data[i].rows[r];
+                        if (tableName)
+                            item.tableName = tableName;
+                        const translatedItem = translateKeys(item);
+                        items.push((table && table.onItemCreate ? table.onItemCreate(translatedItem) : translatedItem));
+                    }
+                }
+                this.operations.delete(key);
+                resolve(items);
+            });
         }) as Promise<IBaseModule<D>[]>;
     }
 
@@ -474,14 +476,20 @@ class Database<D extends string> implements IDatabase<D> {
         const key = "executeRawSql" + JSON.stringify(queries);
         this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
-            (await this.dataBase()).exec(queries, readOnly, (error, result) => {
-                this.operations.delete(key);
-                if (error) {
-                    console.error("SQL Error", error);
-                    reject(error);
-                } else resolve();
+            try {
+                (await this.dataBase()).exec(queries, readOnly, (error, result) => {
 
-            })
+                    if (error) {
+                        console.error("SQL Error", error);
+                        reject(error);
+                    } else resolve();
+                })
+            } catch (e) {
+                console.error(e);
+                reject(e);
+            } finally {
+                this.operations.delete(key);
+            }
         }) as Promise<void>;
     }
 
@@ -489,22 +497,18 @@ class Database<D extends string> implements IDatabase<D> {
         const key = "execute" + query;
         this.operations.set(key, true);
         return new Promise(async (resolve, reject) => {
-            (await this.dataBase()).transaction(
-                (tx) => {
-                    this.info('Executing Query:' + query);
-                    tx.executeSql(query, args);
-                },
-                (error) => {
-                    console.error('Could not execute query:', query, args, error);
-                    this.operations.delete(key)
-                    reject(error);
-                },
-                () => {
-                    this.info('Statment has been executed....', query);
-                    clearTimeout(this.timeout);
-                    this.operations.delete(key)
-                    resolve(true);
-                });
+            try {
+                this.info('Executing Query:' + query);
+                await this.executeRawSql([{ sql: query, args: args || [] }], false);
+                this.info("Quary executed")
+                resolve(true);
+            } catch (e) {
+                console.error('Could not execute query:', query, args, e);
+                reject(e);
+            } finally {
+                this.operations.delete(key);
+                clearTimeout(this.timeout);
+            }
         }) as Promise<boolean>;
     };
 
@@ -530,7 +534,9 @@ class Database<D extends string> implements IDatabase<D> {
 
     setUpDataBase = async (forceCheck?: boolean) => {
         try {
+
             if (!Database.dbIni || forceCheck) {
+                await this.beginTransaction();
                 const dbType = (columnType: ColumnType) => {
                     if (columnType == ColumnType.Boolean || columnType == ColumnType.Number)
                         return "INTEGER";
@@ -559,10 +565,13 @@ class Database<D extends string> implements IDatabase<D> {
                     query += ");";
                     await this.execute(query);
                 }
+                await this.commitTransaction();
             }
 
         } catch (e) {
             console.error(e);
+            await this.rollbackTransaction();
+            throw e;
         }
     }
 

@@ -104,8 +104,8 @@ export interface IQuery<T, D extends string> {
 
 export type IQueryResultItem<T, D extends string> = T & {
     savechanges: () => Promise<IQueryResultItem<T, D>>,
-    delete: () => Promise<void>
-
+    delete: () => Promise<void>,
+    update: (...keys: (keyof T)[]) => Promise<void>
 };
 
 
@@ -113,10 +113,10 @@ export interface IDatabase<D extends string> {
     isClosed?: boolean,
     // Its importend that,createDbContext return new database after this is triggered
     tryToClose: () => Promise<boolean>,
-    close:()=> Promise<void>;
-    beginTransaction:()=> Promise<void>;
-    commitTransaction:()=> Promise<void>;
-    rollbackTransaction:()=> Promise<void>;
+    close: () => Promise<void>;
+    beginTransaction: () => Promise<void>;
+    commitTransaction: () => Promise<void>;
+    rollbackTransaction: () => Promise<void>;
     // Auto close the db after every ms.
     // The db will be able to refresh only if there is no db operation is ongoing.
     // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time.
