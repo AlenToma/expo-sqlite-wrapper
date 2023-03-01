@@ -51,3 +51,12 @@ You could also use `query` builder to load children.
      .With<Child>("parentId")
      .AssignTo("children").toList();
 ```
+
+You could also use `Query` to delete items
+```ts
+      await dbContext.database.query<Parent>("Parents")
+     .Start().Column("name").IN(["name", "testName"]).End()
+     .OR()
+     .Start().Column("email").Contains("test@").End().delete();
+```
+
