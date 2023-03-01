@@ -1,5 +1,21 @@
-import TablaStructor from "./TableStructor";
 import * as SqlLite from 'expo-sqlite'
+
+export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime";
+export type IColumnProps<T extends object, D extends string> = {
+    colType: (colType: ColumnType) => IColumnProps<T, D>;
+    nullable: IColumnProps<T, D>;
+    primary: IColumnProps<T, D>;
+    autoIncrement: IColumnProps<T, D>;
+    unique: IColumnProps<T, D>;
+    encrypt: (encryptionKey: string) => IColumnProps<T, D>;
+    column: (colName: keyof T) => IColumnProps<T, D>;
+};
+
+export type ITableBuilder<T extends object, D extends string> = {
+    column: (colName: keyof T) => IColumnProps<T, D>;
+    constrain: <E extends object>(columnName: keyof T, contraintTableName: D, contraintColumnName: keyof E) => ITableBuilder<T, D>;
+    onItemCreate: (func: (item: T) => T) => ITableBuilder<T, D>;
+};
 
 export class IBaseModule<D extends string> {
     public id: number;
@@ -12,15 +28,15 @@ export class IBaseModule<D extends string> {
 }
 
 export type Operation = "UPDATE" | "INSERT";
-export declare type SingleValue = string | number | boolean | undefined | null;
+export declare type SingleValue = string | number | boolean | Date | undefined | null;
 export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
 export declare type StringValue = string | undefined;
 
 
 export interface IChildQueryLoader<T, B, D extends string> {
-    With: <E>(item: ((x: E) => any) | keyof E) => IChildQueryLoader<T, B, D>;
-    AssignTo: <S, E>(item: ((x: B) => E) | keyof B) => IQuery<B, D>;
+    With: <E>(columnName: keyof E) => IChildQueryLoader<T, B, D>;
+    AssignTo: <S, E>(columnName: keyof B) => IQuery<B, D>;
 }
 
 export interface IWatcher<T, D extends string> {
@@ -72,7 +88,7 @@ export interface IQuaryResult<D extends string> {
 
 
 export interface IQuery<T, D extends string> {
-    Column: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
+    Column: <B>(columnName: keyof T) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
     Contains: (value: StringValue) => IQuery<T, D>;
     StartWith: (value: StringValue) => IQuery<T, D>;
@@ -86,15 +102,15 @@ export interface IQuery<T, D extends string> {
     AND: () => IQuery<T, D>;
     GreaterThan: (value: NumberValue | StringValue) => IQuery<T, D>;
     LessThan: (value: NumberValue | StringValue) => IQuery<T, D>;
-    IN: (value: ArrayValue) => IQuery<T, D>;
-    NotIn: (value: ArrayValue) => IQuery<T, D>;
+    IN: (...value: ArrayValue) => IQuery<T, D>;
+    NotIn: (...value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
     NotNull: () => IQuery<T, D>;
-    OrderByDesc: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
-    OrderByAsc: <B>(item: ((x: T) => B) | keyof T) => IQuery<T, D>;
+    OrderByDesc: <B>(columnName: keyof T) => IQuery<T, D>;
+    OrderByAsc: <B>(columnName: keyof T) => IQuery<T, D>;
     Limit: (value: number) => IQuery<T, D>;
-    LoadChildren: <B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) => IChildQueryLoader<B, T, D>;
-    LoadChild: <B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) => IChildQueryLoader<B, T, D>
+    LoadChildren: <B>(childTableName: D, parentProperty: keyof T) => IChildQueryLoader<B, T, D>;
+    LoadChild: <B>(childTableName: D, parentProperty: keyof T) => IChildQueryLoader<B, T, D>
     delete: () => Promise<void>;
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
@@ -134,7 +150,7 @@ export interface IDatabase<D extends string> {
     execute: (query: string, args?: any[]) => Promise<boolean>;
     dropTables: () => Promise<void>;
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
-    tableHasChanges: <T>(item: TablaStructor<T, D>) => Promise<boolean>;
+    tableHasChanges: <T extends object>(item: ITableBuilder<T, D>) => Promise<boolean>;
     executeRawSql: (queries: SqlLite.Query[], readOnly: boolean) => Promise<void>;
 
 }

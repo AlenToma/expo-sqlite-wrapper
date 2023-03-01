@@ -1,12 +1,12 @@
-import { IBaseModule, SingleValue, ArrayValue,StringValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher } from './expo.sql.wrapper.types'
+import { IBaseModule, SingleValue, ArrayValue,StringValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher , ColumnType} from './expo.sql.wrapper.types'
 import createDbContext from './Database'
-import TableStructor, { ColumnType } from './TableStructor'
+import TableBuilder from './TableStructor'
 
 
 export default createDbContext
 
 export {
-    TableStructor,
+    TableBuilder,
     ColumnType,
     IBaseModule
 }

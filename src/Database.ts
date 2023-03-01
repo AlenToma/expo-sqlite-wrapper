@@ -1,11 +1,10 @@
-import { IBaseModule, IWatcher, IQuery, IDatabase, Operation } from './expo.sql.wrapper.types'
-import { createQueryResultType, validateTableName, Query, single } from './SqlQueryBuilder'
-import TablaStructor, { ColumnType } from './TableStructor'
+import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder } from './expo.sql.wrapper.types'
+import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt } from './SqlQueryBuilder'
+import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 import { ResultSet } from 'expo-sqlite';
 
-
-export default function <D extends string>(databaseTables: TablaStructor<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
+export default function <D extends string>(databaseTables: ITableBuilder<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
     return new Database<D>(databaseTables, getDatabase, onInit, disableLog) as IDatabase<D>;
 }
 
@@ -24,7 +23,7 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
 class Database<D extends string> implements IDatabase<D> {
     private mappedKeys: Map<D, string[]>;
     private dataBase: () => Promise<SQLite.WebSQLDatabase>;
-    private tables: TablaStructor<any, D>[];
+    private tables: TableBuilder<any, D>[];
     private timeout: any = undefined;
     private static dbIni: boolean = false;
     private onInit?: (database: IDatabase<D>) => Promise<void>;
@@ -37,7 +36,7 @@ class Database<D extends string> implements IDatabase<D> {
     private operations: Map<string, boolean>;
     private refresherSettings?: { ms: number } | undefined;
     private disableLog?: boolean;
-    constructor(databaseTables: TablaStructor<any, D>[],
+    constructor(databaseTables: ITableBuilder<any, D>[],
         getDatabase: () => Promise<SQLite.WebSQLDatabase>,
         onInit?: (database: IDatabase<D>) => Promise<void>,
         disableLog?: boolean) {
@@ -59,7 +58,7 @@ class Database<D extends string> implements IDatabase<D> {
             this.isOpen = true;
             return this.db ?? await getDatabase();
         };
-        this.tables = databaseTables;
+        this.tables = databaseTables as TableBuilder<any, D>[];
     }
 
     private log(...items: any[]) {
@@ -117,14 +116,14 @@ class Database<D extends string> implements IDatabase<D> {
                     return;
                 }
 
-
                 this.operations.set(key, true);
                 this.log('Executing Save...');
                 const uiqueItem = await this.getUique(item);
                 const keys = (await this.allowedKeys(item.tableName, true)).filter((x) => Object.keys(item).includes(x));
-                await this.triggerWatch(item, "onSave", uiqueItem ? "UPDATE" : "INSERT", tableName);
+                const sOperations = uiqueItem ? "UPDATE" : "INSERT";
                 let query = '';
                 let args = [] as any[];
+                oEncypt(item);
                 if (uiqueItem) {
                     if (insertOnly) {
                         resolve(item as any);
@@ -147,23 +146,26 @@ class Database<D extends string> implements IDatabase<D> {
                     query += ')';
                 }
                 keys.forEach((k: string, i) => {
-                    args.push((item as any)[k] ?? null);
+                    let v = (item as any)[k] ?? null;
+                    if (v && v instanceof Date)
+                        v = v.toISOString();
+                    if (typeof v === "boolean")
+                        v = v === true ? 1 : 0;
+                    args.push(v);
                 });
                 if (uiqueItem)
                     item.id = uiqueItem.id;
                 if (uiqueItem != undefined)
                     args.push(uiqueItem.id);
                 await this.execute(query, args);
-
                 if (saveAndForget !== true || (item.id === 0 || item.id === undefined)) {
                     const lastItem = ((await this.selectLastRecord<IBaseModule<D>>(item)) ?? item);
                     item.id = lastItem.id;
-                    resolve(lastItem as any as T);
-                    this.operations.delete(key);
-                } else {
-                    resolve(item as any as T);
-                    this.operations.delete(key);
                 }
+                oDecrypt(item);
+                this.operations.delete(key);
+                await this.triggerWatch(item, "onSave", sOperations, tableName);
+                resolve(item as any as T);
             } catch (error) {
                 console.error(error, item);
                 reject(error);
@@ -195,7 +197,7 @@ class Database<D extends string> implements IDatabase<D> {
         var addedisUnique = false;
         var table = this.tables.find(x => x.tableName === item.tableName);
         if (table)
-            table.columns.filter(x => x.isUnique === true).forEach(x => {
+            table.props.filter(x => x.isUnique === true).forEach(x => {
                 var anyItem = item as any;
                 var columnName = x.columnName as string
                 if (anyItem[columnName] !== undefined && anyItem[columnName] !== null) {
@@ -441,9 +443,10 @@ class Database<D extends string> implements IDatabase<D> {
                 }
                 const data = result as ResultSet[]
                 const table = this.tables.find(x => x.tableName == tableName);
-                const booleanColumns = table?.columns.filter(x => x.columnType == ColumnType.Boolean);
+                const booleanColumns = table?.props.filter(x => x.columnType == "Boolean");
+                const dateColumns = table?.props.filter(x => x.columnType == "DateTime");
                 const translateKeys = (item: any) => {
-                    if (!item || !booleanColumns || booleanColumns.length <= 0)
+                    if (!item || !table)
                         return item;
                     booleanColumns.forEach(column => {
                         var columnName = column.columnName as string
@@ -452,8 +455,18 @@ class Database<D extends string> implements IDatabase<D> {
                                 item[columnName] = false;
                             else item[columnName] = true;
                         }
+                    });
 
-                    })
+                    dateColumns.forEach(column => {
+                        var columnName = column.columnName as string
+                        if (item[columnName] != undefined && item[columnName] != null && item[columnName].length > 0) {
+                            try {
+                                item[columnName] = new Date(item[columnName]);
+                            } catch {
+                                /// ignore
+                            }
+                        }
+                    });
                     return item;
                 }
                 var items = [] as IBaseModule<D>[];
@@ -462,7 +475,7 @@ class Database<D extends string> implements IDatabase<D> {
                         const item = data[i].rows[r];
                         if (tableName)
                             item.tableName = tableName;
-                        const translatedItem = translateKeys(item);
+                        const translatedItem = oDecrypt(translateKeys(item), table);
                         items.push((table && table.onItemCreate ? table.onItemCreate(translatedItem) : translatedItem));
                     }
                 }
@@ -515,9 +528,10 @@ class Database<D extends string> implements IDatabase<D> {
     //#endregion
 
     //#region TableSetup
-    public async tableHasChanges<T>(item: TablaStructor<T, D>) {
-        var appSettingsKeys = await this.allowedKeys(item.tableName);
-        return appSettingsKeys.filter(x => x != "id").length != item.columns.filter(x => x.columnName != "id").length || item.columns.filter(x => x.columnName != "id" && !appSettingsKeys.find(a => a == x.columnName)).length > 0;
+    public async tableHasChanges<T extends object>(item: ITableBuilder<T, D>) {
+        const tbBuilder = item as TableBuilder<T, D>;
+        var appSettingsKeys = await this.allowedKeys(tbBuilder.tableName);
+        return appSettingsKeys.filter(x => x != "id").length != tbBuilder.props.filter(x => x.columnName != "id").length || tbBuilder.props.filter(x => x.columnName != "id" && !appSettingsKeys.find(a => a == x.columnName)).length > 0;
     }
 
 
@@ -538,9 +552,9 @@ class Database<D extends string> implements IDatabase<D> {
             if (!Database.dbIni || forceCheck) {
                 await this.beginTransaction();
                 const dbType = (columnType: ColumnType) => {
-                    if (columnType == ColumnType.Boolean || columnType == ColumnType.Number)
+                    if (columnType == "Boolean" || columnType == "Number")
                         return "INTEGER";
-                    if (columnType == ColumnType.Decimal)
+                    if (columnType == "Decimal")
                         return "REAL";
                     return "TEXT";
                 }
@@ -549,17 +563,17 @@ class Database<D extends string> implements IDatabase<D> {
                 this.log("initilize database table setup");
                 for (var table of this.tables) {
                     var query = `CREATE TABLE if not exists ${table.tableName} (`;
-                    table.columns.forEach((col, index) => {
+                    table.props.forEach((col, index) => {
                         query += `${col.columnName.toString()} ${dbType(col.columnType)} ${!col.nullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
                     });
-                    table.columns.filter(x => x.isPrimary === true).forEach((col, index) => {
-                        query += `PRIMARY KEY(${col.columnName.toString()} ${col.autoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.columns.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");
+                    table.props.filter(x => x.isPrimary === true).forEach((col, index) => {
+                        query += `PRIMARY KEY(${col.columnName.toString()} ${col.isAutoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.props.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");
                     });
 
-                    if (table.constraints && table.constraints.length > 0) {
+                    if (table.constrains && table.constrains.length > 0) {
                         query += ",";
-                        table.constraints.forEach((col, index) => {
-                            query += `CONSTRAINT "fk_${col.columnName.toString()}" FOREIGN KEY(${col.columnName.toString()}) REFERENCES ${col.contraintTableName}(${col.contraintColumnName})` + (index < (table.constraints?.length ?? 0) - 1 ? ",\n" : "\n");
+                        table.constrains.forEach((col, index) => {
+                            query += `CONSTRAINT "fk_${col.columnName.toString()}" FOREIGN KEY(${col.columnName.toString()}) REFERENCES ${col.contraintTableName}(${col.contraintColumnName})` + (index < (table.constrains?.length ?? 0) - 1 ? ",\n" : "\n");
                         });
                     }
                     query += ");";

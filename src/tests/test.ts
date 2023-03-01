@@ -22,7 +22,7 @@ mocha.describe("DeleteWthLimit", function () {
 
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Limit(100).OrderByAsc(x=> x.name).getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test")
+    q.Limit(100).OrderByAsc("name").getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test")
 });
 
 
@@ -30,14 +30,14 @@ mocha.describe("DeleteWithSearch", function () {
 
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Start().Column(x=> x.id).EqualTo(50).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id = ? )")
+    q.Start().Column("id").EqualTo(50).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id = ? )")
 });
 
 mocha.describe("DeleteWithSearchNotIn", function () {
 
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Start().Column(x=> x.id).NotIn([10,2]).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
+    q.Start().Column("id").NotIn(10,2).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
 });
 
 
@@ -52,25 +52,25 @@ mocha.describe("OrderDesc", function () {
 
     var q = new Query<Test, TableName>("Test", database);
 
-    q.OrderByDesc(x=> x.id).getQueryResult().sql.trim().should.eql("SELECT * FROM Test Order By id DESC")
+    q.OrderByDesc("id").getQueryResult().sql.trim().should.eql("SELECT * FROM Test Order By id DESC")
 });
 
 mocha.describe("OrderAsc", function () {
     var q = new Query<Test, TableName>("Test", database);
 
-    q.OrderByAsc(x=> x.id).getQueryResult().sql.trim().should.eql("SELECT * FROM Test Order By id ASC")
+    q.OrderByAsc("id").getQueryResult().sql.trim().should.eql("SELECT * FROM Test Order By id ASC")
 });
 
 
 mocha.describe("WhereColumn", function () {
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Column(x=> x.name).Contains("test").OrderByDesc(x=> x.id).getQueryResult().sql.trim().should.eql("SELECT * FROM Test  WHERE name like ? Order By id DESC")
+    q.Column("name").Contains("test").OrderByDesc("id").getQueryResult().sql.trim().should.eql("SELECT * FROM Test  WHERE name like ? Order By id DESC")
 });
 
 
 mocha.describe("lessString", function () {
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Column(x=> x.name).LessThan("15").getQueryResult().sql.trim().should.eql("SELECT * FROM Test  WHERE name < ?")
+    q.Column("name").LessThan("15").getQueryResult().sql.trim().should.eql("SELECT * FROM Test  WHERE name < ?")
 });

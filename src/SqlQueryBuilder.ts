@@ -1,4 +1,6 @@
 import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
+import { TableBuilder } from './TableStructor';
+import crypto from 'crypto-js'
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
     result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any, false, undefined, true))[0], database) };
@@ -41,6 +43,49 @@ export const createQueryResultType = async function <T, D extends string>(item: 
     }
     return result;
 }
+
+const encryptionsIdentifier = "#dbEncrypted&";
+
+export const encrypt = (str: string, key: string) => {
+    if (!str || str == "" || str.startsWith(encryptionsIdentifier))
+        return str; // already Encrypted
+
+    return encryptionsIdentifier + crypto.AES.encrypt(str, key).toString();
+}
+
+export const oEncypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
+    if (!tableBuilder)
+        return item;
+    tableBuilder.props.filter(x => x.encryptionKey).forEach(x => {
+        const v = item[x.columnName];
+        if (v)
+            item[x.columnName] = encrypt(v, x.encryptionKey);
+    });
+    return item;
+}
+
+export const oDecrypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
+    if (!tableBuilder)
+        return item;
+    tableBuilder.props.filter(x => x.encryptionKey).forEach(x => {
+        const v = item[x.columnName];
+        if (v)
+            item[x.columnName] = decrypt(v, x.encryptionKey);
+    });
+
+    return item;
+}
+
+export const decrypt = (str: string, key: string) => {
+    if (!str || str == "" || !str.startsWith(encryptionsIdentifier))
+        return str;
+    str = str.substring(encryptionsIdentifier.length)
+    const bytes = crypto.AES.decrypt(str, key);
+    const originalText = bytes.toString(crypto.enc.Utf8);
+    return originalText;
+}
+
+
 export const validateTableName = function <T, D extends string>(item: IBaseModule<D>, tableName?: D) {
     if (!item.tableName || item.tableName.length <= 2)
         if (!tableName)
@@ -66,16 +111,16 @@ class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B
         this.tableName = tableName;
     }
 
-    With<E>(item: ((x: E) => any) | keyof E) {
+    With<E>(columnName: keyof E) {
         var child = this.parent.Children[this.parent.Children.length - 1];
-        child.childProperty = getColumns("function " + item.toString()) ?? "";
+        child.childProperty = getColumns("function " + columnName.toString()) 
         child.childTableName = this.tableName;
         return this;
     }
 
-    AssignTo<S, E>(item: ((x: B) => E) | keyof B) {
+    AssignTo<S, E>(columnName: keyof B) {
         var child = this.parent.Children[this.parent.Children.length - 1];
-        child.assignTo = getColumns("function " + item.toString()) ?? "";
+        child.assignTo = getColumns("function " + columnName.toString()) 
         return this.parent as IQuery<B, D>;
     }
 }
@@ -242,8 +287,8 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     //#endregion
 
     //#region public Methods
-    Column<B>(item: ((x: T) => B) | keyof T) {
-        this.Queries.push("function " + item.toString());
+    Column<B>(columnName: keyof T) {
+        this.Queries.push("function " + columnName.toString());
         return this;
     }
 
@@ -300,12 +345,12 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    IN(value: ArrayValue) {
+    IN(...value: ArrayValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.IN);
         return this;
     }
 
-    NotIn(value: ArrayValue) {
+    NotIn(...value: ArrayValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.NotIn);
         return this;
     }
@@ -335,15 +380,15 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    OrderByAsc<B>(item: keyof T | ((x: T) => B)) {
+    OrderByAsc<B>(columnName: keyof T) {
         this.Queries.push(Param.OrderByAsc)
-        this.Queries.push("function " + item.toString());
+        this.Queries.push("function " + columnName.toString());
         return this;
     }
 
-    OrderByDesc<B>(item: keyof T | ((x: T) => B)) {
+    OrderByDesc<B>(columnName: keyof T) {
         this.Queries.push(Param.OrderByDesc)
-        this.Queries.push("function " + item.toString());
+        this.Queries.push("function " + columnName.toString());
         return this;
     }
 
@@ -352,9 +397,9 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    LoadChildren<B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) {
+    LoadChildren<B>(childTableName: D, parentProperty: keyof T) {
         var item = {
-            parentProperty: getColumns("function " + parentProperty.toString()),
+            parentProperty: parentProperty,
             parentTable: this.tableName,
             childTableName: childTableName,
             childProperty: '',
@@ -366,9 +411,9 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
 
-    LoadChild<B>(childTableName: D, parentProperty: ((x: T) => B) | keyof T) {
+    LoadChild<B>(childTableName: D, parentProperty: keyof T) {
         var item = {
-            parentProperty: getColumns("function " + parentProperty.toString()),
+            parentProperty: parentProperty,
             parentTable: this.tableName,
             childTableName: childTableName,
             childProperty: '',
@@ -419,6 +464,16 @@ export class Query<T, D extends string> implements IQuery<T, D>{
             result.sql += s + ' ';
         };
 
+        const translateValue = (v: any) => {
+            if (v === null || v === undefined)
+                return v;
+            if (v instanceof Date)
+                return (v as Date).toISOString();
+            if (typeof v === "boolean")
+                return v === true ? 1 : 0;
+            return v;
+        }
+
         const translate = (value: any) => {
             var pValue = this.prevValue(queries);
             switch (value) {
@@ -454,15 +509,14 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     break;
                 default: {
                     if (isFunc(value)) appendSql(getColumns(value) ?? '');
-                    else if (value.queryValue !== undefined &&
-                        (pValue === Param.IN || pValue == Param.NotIn)
+                    else if (value.queryValue !== undefined && (pValue === Param.IN || pValue == Param.NotIn)
                     ) {
                         var v = Array.isArray(value.queryValue)
                             ? (value.queryValue as any[])
                             : [value.queryValue];
                         appendSql(`( ${v.map((x) => '?').join(',')} )`);
                         v.forEach((x) => {
-                            if (x !== undefined) result.values.push(x);
+                            if (x !== undefined) result.values.push(translateValue(x));
                         });
                     } else if (value.queryValue !== undefined) {
                         if (pValue == Param.Contains || pValue == Param.StartWith || pValue == Param.EndWith) {
@@ -476,7 +530,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                         appendSql('?');
                         if (Array.isArray(value.queryValue))
                             value.queryValue = (value.queryValue as []).join(',');
-                        result.values.push(value.queryValue);
+                        result.values.push(translateValue(value.queryValue));
                     }
                 }
             }

@@ -33,12 +33,13 @@
   },
   "license": "MIT",
   "dependencies": {
+    "crypto-js": "^4.1.1",
     "expo-sqlite": "*"
   },
   "devDependencies": {
     "@types/node": "^17.0.21",
-    "typescript": "*",
     "mocha": "^9.2.2",
-    "should": "^13.2.3"
+    "should": "^13.2.3",
+    "typescript": "*"
   }
 }
