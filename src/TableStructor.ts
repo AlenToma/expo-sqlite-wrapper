@@ -8,19 +8,19 @@ class ColumnProps<T extends object, D extends string> {
     isPrimary?: boolean;
     isAutoIncrement?: boolean;
     isUnique?: boolean;
-    onColumn: (colName: keyof T) => ColumnProps<T, D>;
     encryptionKey?: string;
     tableName: D;
+    parent: TableBuilder<T, D>;
     constructor(
         tableName: D,
         columnName: keyof T,
-        onColumn: (colName: keyof T) => ColumnProps<T, D>
-      
+        parent: TableBuilder<T, D>
+
     ) {
         this.columnName = columnName;
         this.columnType = 'String';
-        this.onColumn = onColumn;
         this.tableName = tableName;
+        this.parent = parent;
     }
 
     colType(colType: ColumnType) {
@@ -64,8 +64,10 @@ class ColumnProps<T extends object, D extends string> {
     }
 
     column(colName: keyof T) {
-        return this.onColumn(colName);
+        return this.parent.column(colName);
     }
+
+
 }
 
 export class TableBuilder<T extends object, D extends string> {
@@ -85,8 +87,7 @@ export class TableBuilder<T extends object, D extends string> {
     }
 
     column(colName: keyof T) {
-        const func = this.column.bind(this) as any;
-        const col = new ColumnProps<T, D>(this.tableName, colName, func);
+        const col = new ColumnProps<T, D>(this.tableName, colName, this);
         this.props.push(col);
         return col as any as IColumnProps<T, D>;
     }

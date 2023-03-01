@@ -1,4 +1,4 @@
-import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder } from './expo.sql.wrapper.types'
+import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder, IColumnProps } from './expo.sql.wrapper.types'
 import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt } from './SqlQueryBuilder'
 import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
@@ -36,7 +36,7 @@ class Database<D extends string> implements IDatabase<D> {
     private operations: Map<string, boolean>;
     private refresherSettings?: { ms: number } | undefined;
     private disableLog?: boolean;
-    constructor(databaseTables: ITableBuilder<any, D>[],
+    constructor(databaseTables: (ITableBuilder<any, D> | IColumnProps<any, D>)[],
         getDatabase: () => Promise<SQLite.WebSQLDatabase>,
         onInit?: (database: IDatabase<D>) => Promise<void>,
         disableLog?: boolean) {
@@ -58,7 +58,13 @@ class Database<D extends string> implements IDatabase<D> {
             this.isOpen = true;
             return this.db ?? await getDatabase();
         };
-        this.tables = databaseTables as TableBuilder<any, D>[];
+        this.tables = [];
+        
+        databaseTables.forEach((x: any) => {
+            if (x.parent)
+                this.tables.push(x.parent);
+            else this.tables.push(x);
+        });
     }
 
     private log(...items: any[]) {
