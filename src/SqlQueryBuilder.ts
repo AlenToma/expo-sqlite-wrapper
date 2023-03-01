@@ -1,4 +1,4 @@
-import { IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
+import { NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
 import { TableBuilder } from './TableStructor';
 import crypto from 'crypto-js'
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
@@ -42,6 +42,24 @@ export const createQueryResultType = async function <T, D extends string>(item: 
         }
     }
     return result;
+}
+
+export const translateToSqliteValue = (v: any) => {
+    if (v === null || v === undefined)
+        return v;
+    if (isDate(v))
+        return (v as Date).toISOString();
+    if (typeof v === "boolean")
+        return v === true ? 1 : 0;
+    return v;
+}
+
+export const isDate = (v: any) => {
+    if (v === null || v === undefined)
+        return false;
+    if (Object.prototype.toString.call(v) === "[object Date]")
+        return true;
+    return false;
 }
 
 const encryptionsIdentifier = "#dbEncrypted&";
@@ -111,16 +129,16 @@ class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B
         this.tableName = tableName;
     }
 
-    With<E>(columnName: keyof E) {
+    With<E extends object>(columnName: NonFunctionPropertyNames<E>) {
         var child = this.parent.Children[this.parent.Children.length - 1];
-        child.childProperty = getColumns("function " + columnName.toString()) 
+        child.childProperty = getColumns("function " + columnName.toString())
         child.childTableName = this.tableName;
         return this;
     }
 
-    AssignTo<S, E>(columnName: keyof B) {
+    AssignTo<S, E>(columnName: NonFunctionPropertyNames<B>) {
         var child = this.parent.Children[this.parent.Children.length - 1];
-        child.assignTo = getColumns("function " + columnName.toString()) 
+        child.assignTo = getColumns("function " + columnName.toString())
         return this.parent as IQuery<B, D>;
     }
 }
@@ -287,7 +305,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     //#endregion
 
     //#region public Methods
-    Column<B>(columnName: keyof T) {
+    Column(columnName: NonFunctionPropertyNames<T>) {
         this.Queries.push("function " + columnName.toString());
         return this;
     }
@@ -345,12 +363,12 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    IN(...value: ArrayValue) {
+    IN(value: ArrayValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.IN);
         return this;
     }
 
-    NotIn(...value: ArrayValue) {
+    NotIn(value: ArrayValue) {
         if (this.Queries.length > 0) this.validateValue(value, Param.NotIn);
         return this;
     }
@@ -380,13 +398,13 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    OrderByAsc<B>(columnName: keyof T) {
+    OrderByAsc(columnName: NonFunctionPropertyNames<T>) {
         this.Queries.push(Param.OrderByAsc)
         this.Queries.push("function " + columnName.toString());
         return this;
     }
 
-    OrderByDesc<B>(columnName: keyof T) {
+    OrderByDesc(columnName: NonFunctionPropertyNames<T>) {
         this.Queries.push(Param.OrderByDesc)
         this.Queries.push("function " + columnName.toString());
         return this;
@@ -397,7 +415,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    LoadChildren<B>(childTableName: D, parentProperty: keyof T) {
+    LoadChildren<B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) {
         var item = {
             parentProperty: parentProperty,
             parentTable: this.tableName,
@@ -411,7 +429,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
 
-    LoadChild<B>(childTableName: D, parentProperty: keyof T) {
+    LoadChild<B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) {
         var item = {
             parentProperty: parentProperty,
             parentTable: this.tableName,
@@ -464,15 +482,6 @@ export class Query<T, D extends string> implements IQuery<T, D>{
             result.sql += s + ' ';
         };
 
-        const translateValue = (v: any) => {
-            if (v === null || v === undefined)
-                return v;
-            if (v instanceof Date)
-                return (v as Date).toISOString();
-            if (typeof v === "boolean")
-                return v === true ? 1 : 0;
-            return v;
-        }
 
         const translate = (value: any) => {
             var pValue = this.prevValue(queries);
@@ -516,21 +525,21 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                             : [value.queryValue];
                         appendSql(`( ${v.map((x) => '?').join(',')} )`);
                         v.forEach((x) => {
-                            if (x !== undefined) result.values.push(translateValue(x));
+                            if (x !== undefined) result.values.push(translateToSqliteValue(x));
                         });
                     } else if (value.queryValue !== undefined) {
                         if (pValue == Param.Contains || pValue == Param.StartWith || pValue == Param.EndWith) {
                             if (pValue == Param.Contains)
-                                value = { queryValue: `%${value.queryValue}%` }
+                                value = { queryValue: `%${translateToSqliteValue(value.queryValue)}%` }
                             else if (pValue == Param.StartWith)
-                                value = { queryValue: `${value.queryValue}%` }
-                            else value = { queryValue: `%${value.queryValue}` }
-                        }
+                                value = { queryValue: `${translateToSqliteValue(value.queryValue)}%` }
+                            else value = { queryValue: `%${translateToSqliteValue(value.queryValue)}` }
+                        } else value.queryValue = translateToSqliteValue(value.queryValue)
 
                         appendSql('?');
                         if (Array.isArray(value.queryValue))
-                            value.queryValue = (value.queryValue as []).join(',');
-                        result.values.push(translateValue(value.queryValue));
+                            value.queryValue = (value.queryValue as []).map(x=> translateToSqliteValue(x)).join(',');
+                        result.values.push(value.queryValue);
                     }
                 }
             }

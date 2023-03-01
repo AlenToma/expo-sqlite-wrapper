@@ -37,7 +37,7 @@ mocha.describe("DeleteWithSearchNotIn", function () {
 
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Start().Column("id").NotIn(10,2).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
+    q.Start().Column("id").NotIn([10,2]).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
 });
 
 

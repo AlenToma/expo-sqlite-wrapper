@@ -1,7 +1,7 @@
-import { ColumnType, IColumnProps, ITableBuilder } from './expo.sql.wrapper.types'
+import { ColumnType, ITableBuilder } from './expo.sql.wrapper.types'
 
 
-class ColumnProps<T extends object, D extends string> {
+interface ColumnProps<T, D extends string> {
     columnType: ColumnType;
     isNullable?: boolean;
     columnName: keyof T;
@@ -9,68 +9,9 @@ class ColumnProps<T extends object, D extends string> {
     isAutoIncrement?: boolean;
     isUnique?: boolean;
     encryptionKey?: string;
-    tableName: D;
-    parent: TableBuilder<T, D>;
-    constructor(
-        tableName: D,
-        columnName: keyof T,
-        parent: TableBuilder<T, D>
-
-    ) {
-        this.columnName = columnName;
-        this.columnType = 'String';
-        this.tableName = tableName;
-        this.parent = parent;
-    }
-
-    colType(colType: ColumnType) {
-        if (colType !== "String" && this.encryptionKey) {
-            const ms = `Error:Encryption can only be done to columns with String Types. (${this.tableName}.${this.columnName as string})`
-            console.error(ms)
-            throw ms;
-        }
-        this.columnType = colType;
-        return this;
-    }
-
-    get nullable() {
-        this.isNullable = true;
-        return this;
-    }
-
-    get primary() {
-        this.isPrimary = true;
-        return this;
-    }
-
-    get autoIncrement() {
-        this.isAutoIncrement = true;
-        return this;
-    }
-
-    get unique() {
-        this.isUnique = true;
-        return this;
-    }
-
-    encrypt(encryptionKey: string) {
-        if (this.columnType !== "String") {
-            const ms = `Error:Encryption can only be done to columns with String Types. (${this.tableName}.${this.columnName as string})`
-            console.error(ms)
-            throw ms;
-        }
-        this.encryptionKey = encryptionKey;
-        return this;
-    }
-
-    column(colName: keyof T) {
-        return this.parent.column(colName);
-    }
-
-
 }
 
-export class TableBuilder<T extends object, D extends string> {
+export class TableBuilder<T, D extends string> {
     props: ColumnProps<T, D>[];
     constrains: { columnName: keyof T, contraintTableName: D, contraintColumnName: any }[];
     tableName: D;
@@ -81,15 +22,81 @@ export class TableBuilder<T extends object, D extends string> {
         this.constrains = [];
     }
 
+    colType(colType: ColumnType) {
+        if (colType !== "String" && this.getLastProp.encryptionKey) {
+            const ms = `Error:Encryption can only be done to columns with String Types. (${this.tableName}.${this.getLastProp.columnName as string})`
+            console.error(ms)
+            throw ms;
+        }
+        this.getLastProp.columnType = colType;
+        return this;
+    }
+
+    get boolean() {
+        return this.colType("Boolean");
+    }
+
+    get number() {
+        return this.colType("Number");
+    }
+
+    get decimal() {
+        return this.colType("Decimal");
+    }
+
+    get string() {
+        return this.colType("String");
+    }
+
+    get dateTime() {
+        return this.colType("DateTime");
+    }
+
+    get nullable() {
+        this.getLastProp.isNullable = true;
+        return this;
+    }
+
+    get primary() {
+        this.getLastProp.isPrimary = true;
+        return this;
+    }
+
+    get autoIncrement() {
+        this.getLastProp.isAutoIncrement = true;
+        return this;
+    }
+
+    get unique() {
+        this.getLastProp.isUnique = true;
+        return this;
+    }
+
+    encrypt(encryptionKey: string) {
+        if (this.getLastProp.columnType !== "String") {
+            const ms = `Error:Encryption can only be done to columns with String Types. (${this.tableName}.${this.getLastProp.columnName as string})`
+            console.error(ms)
+            throw ms;
+        }
+        this.getLastProp.encryptionKey = encryptionKey;
+        return this;
+    }
+
+    get getLastProp(){
+        if (this.props.length>0)
+            return this.props[this.props.length-1];
+        return {} as ColumnProps<T, D>;
+    }
+
     onItemCreate(func: (item: T) => T) {
         this.itemCreate = func;
         return this;
     }
 
     column(colName: keyof T) {
-        const col = new ColumnProps<T, D>(this.tableName, colName, this);
+        const col = {columnName: colName, columnType: "String"} as ColumnProps<T,D>
         this.props.push(col);
-        return col as any as IColumnProps<T, D>;
+        return this;
     }
 
     constrain<E extends object>(columnName: keyof T, contraintTableName: D, contraintColumnName: keyof E) {

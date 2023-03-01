@@ -1,5 +1,5 @@
-import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder, IColumnProps } from './expo.sql.wrapper.types'
-import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt } from './SqlQueryBuilder'
+import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder } from './expo.sql.wrapper.types'
+import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt, isDate } from './SqlQueryBuilder'
 import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 import { ResultSet } from 'expo-sqlite';
@@ -36,7 +36,7 @@ class Database<D extends string> implements IDatabase<D> {
     private operations: Map<string, boolean>;
     private refresherSettings?: { ms: number } | undefined;
     private disableLog?: boolean;
-    constructor(databaseTables: (ITableBuilder<any, D> | IColumnProps<any, D>)[],
+    constructor(databaseTables: ITableBuilder<any, D>[],
         getDatabase: () => Promise<SQLite.WebSQLDatabase>,
         onInit?: (database: IDatabase<D>) => Promise<void>,
         disableLog?: boolean) {
@@ -58,13 +58,7 @@ class Database<D extends string> implements IDatabase<D> {
             this.isOpen = true;
             return this.db ?? await getDatabase();
         };
-        this.tables = [];
-        
-        databaseTables.forEach((x: any) => {
-            if (x.parent)
-                this.tables.push(x.parent);
-            else this.tables.push(x);
-        });
+        this.tables = databaseTables as TableBuilder<any, D>[];
     }
 
     private log(...items: any[]) {
@@ -153,7 +147,7 @@ class Database<D extends string> implements IDatabase<D> {
                 }
                 keys.forEach((k: string, i) => {
                     let v = (item as any)[k] ?? null;
-                    if (v && v instanceof Date)
+                    if (isDate(v))
                         v = v.toISOString();
                     if (typeof v === "boolean")
                         v = v === true ? 1 : 0;
@@ -481,8 +475,9 @@ class Database<D extends string> implements IDatabase<D> {
                         const item = data[i].rows[r];
                         if (tableName)
                             item.tableName = tableName;
-                        const translatedItem = oDecrypt(translateKeys(item), table);
-                        items.push((table && table.onItemCreate ? table.onItemCreate(translatedItem) : translatedItem));
+                        let translatedItem = translateKeys(item)
+                        oDecrypt(translatedItem, table);
+                        items.push((table && table.itemCreate ? table.itemCreate(translatedItem) : translatedItem));
                     }
                 }
                 this.operations.delete(key);
@@ -534,7 +529,7 @@ class Database<D extends string> implements IDatabase<D> {
     //#endregion
 
     //#region TableSetup
-    public async tableHasChanges<T extends object>(item: ITableBuilder<T, D>) {
+    public async tableHasChanges<T>(item: ITableBuilder<T, D>) {
         const tbBuilder = item as TableBuilder<T, D>;
         var appSettingsKeys = await this.allowedKeys(tbBuilder.tableName);
         return appSettingsKeys.filter(x => x != "id").length != tbBuilder.props.filter(x => x.columnName != "id").length || tbBuilder.props.filter(x => x.columnName != "id" && !appSettingsKeys.find(a => a == x.columnName)).length > 0;
@@ -570,7 +565,7 @@ class Database<D extends string> implements IDatabase<D> {
                 for (var table of this.tables) {
                     var query = `CREATE TABLE if not exists ${table.tableName} (`;
                     table.props.forEach((col, index) => {
-                        query += `${col.columnName.toString()} ${dbType(col.columnType)} ${!col.nullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
+                        query += `${col.columnName.toString()} ${dbType(col.columnType)} ${!col.isNullable ? "NOT NULL" : ""} ${col.isPrimary ? "UNIQUE" : ""},\n`
                     });
                     table.props.filter(x => x.isPrimary === true).forEach((col, index) => {
                         query += `PRIMARY KEY(${col.columnName.toString()} ${col.isAutoIncrement === true ? "AUTOINCREMENT" : ""})` + (index < table.props.filter(x => x.isPrimary === true).length - 1 ? ",\n" : "\n");

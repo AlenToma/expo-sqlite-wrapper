@@ -1,19 +1,22 @@
 import * as SqlLite from 'expo-sqlite'
 
 export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime";
-export type IColumnProps<T extends object, D extends string> = {
-    colType: (colType: ColumnType) => IColumnProps<T, D>;
-    nullable: IColumnProps<T, D>;
-    primary: IColumnProps<T, D>;
-    autoIncrement: IColumnProps<T, D>;
-    unique: IColumnProps<T, D>;
-    encrypt: (encryptionKey: string) => IColumnProps<T, D>;
-    column: (colName: keyof T) => IColumnProps<T, D>;
-};
 
-export type ITableBuilder<T extends object, D extends string> = {
-    column: (colName: keyof T) => IColumnProps<T, D>;
-    constrain: <E extends object>(columnName: keyof T, contraintTableName: D, contraintColumnName: keyof E) => ITableBuilder<T, D>;
+export type NonFunctionPropertyNames<T> = { [K in keyof T]: T[K] extends Function ? never : K }[keyof T];
+
+export type ITableBuilder<T, D extends string> = {
+    nullable: ITableBuilder<T, D>;
+    primary: ITableBuilder<T, D>;
+    autoIncrement: ITableBuilder<T, D>;
+    unique: ITableBuilder<T, D>;
+    boolean: ITableBuilder<T, D>;
+    number: ITableBuilder<T, D>;
+    decimal: ITableBuilder<T, D>;
+    string: ITableBuilder<T, D>;
+    dateTime: ITableBuilder<T, D>;
+    encrypt: (encryptionKey: string) => ITableBuilder<T, D>;
+    column: (colName: NonFunctionPropertyNames<T>) => ITableBuilder<T, D>;
+    constrain: <E>(columnName: NonFunctionPropertyNames<T>, contraintTableName: D, contraintColumnName: NonFunctionPropertyNames<E>) => ITableBuilder<T, D>;
     onItemCreate: (func: (item: T) => T) => ITableBuilder<T, D>;
 };
 
@@ -35,8 +38,8 @@ export declare type StringValue = string | undefined;
 
 
 export interface IChildQueryLoader<T, B, D extends string> {
-    With: <E>(columnName: keyof E) => IChildQueryLoader<T, B, D>;
-    AssignTo: <S, E>(columnName: keyof B) => IQuery<B, D>;
+    With: <E>(columnName: NonFunctionPropertyNames<E>) => IChildQueryLoader<T, B, D>;
+    AssignTo: <S, E>(columnName: NonFunctionPropertyNames<B>) => IQuery<B, D>;
 }
 
 export interface IWatcher<T, D extends string> {
@@ -88,7 +91,7 @@ export interface IQuaryResult<D extends string> {
 
 
 export interface IQuery<T, D extends string> {
-    Column: <B>(columnName: keyof T) => IQuery<T, D>;
+    Column: (columnName: NonFunctionPropertyNames<T>) => IQuery<T, D>;
     EqualTo: (value: SingleValue) => IQuery<T, D>;
     Contains: (value: StringValue) => IQuery<T, D>;
     StartWith: (value: StringValue) => IQuery<T, D>;
@@ -102,15 +105,15 @@ export interface IQuery<T, D extends string> {
     AND: () => IQuery<T, D>;
     GreaterThan: (value: NumberValue | StringValue) => IQuery<T, D>;
     LessThan: (value: NumberValue | StringValue) => IQuery<T, D>;
-    IN: (...value: ArrayValue) => IQuery<T, D>;
-    NotIn: (...value: ArrayValue) => IQuery<T, D>;
+    IN: (value: ArrayValue) => IQuery<T, D>;
+    NotIn: (value: ArrayValue) => IQuery<T, D>;
     Null: () => IQuery<T, D>;
     NotNull: () => IQuery<T, D>;
-    OrderByDesc: <B>(columnName: keyof T) => IQuery<T, D>;
-    OrderByAsc: <B>(columnName: keyof T) => IQuery<T, D>;
+    OrderByDesc: (columnName: NonFunctionPropertyNames<T>) => IQuery<T, D>;
+    OrderByAsc: (columnName: NonFunctionPropertyNames<T>) => IQuery<T, D>;
     Limit: (value: number) => IQuery<T, D>;
-    LoadChildren: <B>(childTableName: D, parentProperty: keyof T) => IChildQueryLoader<B, T, D>;
-    LoadChild: <B>(childTableName: D, parentProperty: keyof T) => IChildQueryLoader<B, T, D>
+    LoadChildren: <B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) => IChildQueryLoader<B, T, D>;
+    LoadChild: <B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) => IChildQueryLoader<B, T, D>
     delete: () => Promise<void>;
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
@@ -121,7 +124,7 @@ export interface IQuery<T, D extends string> {
 export type IQueryResultItem<T, D extends string> = T & {
     savechanges: () => Promise<IQueryResultItem<T, D>>,
     delete: () => Promise<void>,
-    update: (...keys: (keyof T)[]) => Promise<void>
+    update: (...keys: (NonFunctionPropertyNames<T>)[]) => Promise<void>
 };
 
 
@@ -150,7 +153,7 @@ export interface IDatabase<D extends string> {
     execute: (query: string, args?: any[]) => Promise<boolean>;
     dropTables: () => Promise<void>;
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
-    tableHasChanges: <T extends object>(item: ITableBuilder<T, D>) => Promise<boolean>;
+    tableHasChanges: <T>(item: ITableBuilder<T, D>) => Promise<boolean>;
     executeRawSql: (queries: SqlLite.Query[], readOnly: boolean) => Promise<void>;
 
 }
