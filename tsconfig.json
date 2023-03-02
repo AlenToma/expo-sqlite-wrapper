@@ -15,6 +15,7 @@
       "sourceMap": true,
       "target": "es2017",
       "rootDirs": ["src/"],
+      "removeComments": false
     },
     "include": ["src/**/*", "./typings"],
     "exclude": ["node_modules", "dist", "**/__mocks__*", "**/*.spec.**", "test", "assets"]

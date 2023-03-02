@@ -16,6 +16,7 @@ export class TableBuilder<T, D extends string> {
     constrains: { columnName: keyof T, contraintTableName: D, contraintColumnName: any }[];
     tableName: D;
     itemCreate?: (item: T) => T;
+    typeProptoType?: any;
     constructor(tableName: D) {
         this.props = [];
         this.tableName = tableName;
@@ -72,6 +73,17 @@ export class TableBuilder<T, D extends string> {
         return this;
     }
 
+    get getLastProp() {
+        if (this.props.length > 0)
+            return this.props[this.props.length - 1];
+        return {} as ColumnProps<T, D>;
+    }
+
+    objectPrototype(objectProptoType: any) {
+        this.typeProptoType = objectProptoType;
+        return this;
+    }
+
     encrypt(encryptionKey: string) {
         if (this.getLastProp.columnType !== "String") {
             const ms = `Error:Encryption can only be done to columns with String Types. (${this.tableName}.${this.getLastProp.columnName as string})`
@@ -82,11 +94,6 @@ export class TableBuilder<T, D extends string> {
         return this;
     }
 
-    get getLastProp(){
-        if (this.props.length>0)
-            return this.props[this.props.length-1];
-        return {} as ColumnProps<T, D>;
-    }
 
     onItemCreate(func: (item: T) => T) {
         this.itemCreate = func;
@@ -94,7 +101,7 @@ export class TableBuilder<T, D extends string> {
     }
 
     column(colName: keyof T) {
-        const col = {columnName: colName, columnType: "String"} as ColumnProps<T,D>
+        const col = { columnName: colName, columnType: "String" } as ColumnProps<T, D>
         this.props.push(col);
         return this;
     }

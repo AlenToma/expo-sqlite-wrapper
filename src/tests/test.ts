@@ -1,6 +1,6 @@
 import 'should'
 import mocha from 'mocha'
-import { createQueryResultType, Query } from '../SqlQueryBuilder';
+import { createQueryResultType, Query, jsonToSqlite } from '../SqlQueryBuilder';
 interface Test {
     name: string;
     id: number;
@@ -17,6 +17,23 @@ const item = {
     name: "test 1",
     id: 1
 } as Test
+
+
+mocha.describe("JsonToSql", function () {
+
+   const sql = jsonToSqlite({
+        type: 'select',
+        table: 'DetaliItems',
+        condition:{"DetaliItems.id":{$gt: 1}, "DetaliItems.title": "Epic Of Caterpillar"},  
+        join: {
+            Chapters: {
+                on: {'DetaliItems.id': 'Chapters.detaliItem_Id'} 
+            }
+        }
+    })
+
+    sql.sql.trim().should.eql("select * from DetaliItems join Chapters on DetaliItems.id = Chapters.detaliItem_Id where DetaliItems.id > 1 and DetaliItems.title = ?;")
+});
 
 mocha.describe("DeleteWthLimit", function () {
 

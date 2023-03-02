@@ -1,5 +1,5 @@
 import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder } from './expo.sql.wrapper.types'
-import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt, isDate } from './SqlQueryBuilder'
+import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt, isDate, CreateSqlInstaceOfType, jsonToSqlite } from './SqlQueryBuilder'
 import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 import { ResultSet } from 'expo-sqlite';
@@ -397,6 +397,11 @@ class Database<D extends string> implements IDatabase<D> {
 
     }
 
+    async jsonToSql<T>(jsonQuery: any, tableName?: D) {
+        const query = jsonToSqlite(jsonQuery);
+        return ((await this.find(query.sql, query.args, tableName)) as any) as T[];
+    }
+
     async where<T>(tableName: D, query?: any | T) {
         var q = `SELECT * FROM ${tableName} ${query ? 'WHERE ' : ''}`;
         var values = [] as any[];
@@ -477,7 +482,10 @@ class Database<D extends string> implements IDatabase<D> {
                             item.tableName = tableName;
                         let translatedItem = translateKeys(item)
                         oDecrypt(translatedItem, table);
-                        items.push((table && table.itemCreate ? table.itemCreate(translatedItem) : translatedItem));
+                        if (table && table.typeProptoType)
+                            translatedItem = CreateSqlInstaceOfType(table.typeProptoType, translatedItem);
+                        const rItem = (table && table.itemCreate ? table.itemCreate(translatedItem) : translatedItem);
+                        items.push(rItem);
                     }
                 }
                 this.operations.delete(key);

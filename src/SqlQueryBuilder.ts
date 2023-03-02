@@ -1,6 +1,17 @@
 import { NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
 import { TableBuilder } from './TableStructor';
 import crypto from 'crypto-js'
+import jsonsql from 'json-sql'
+
+export const CreateSqlInstaceOfType=(prototype: any, item: any) =>{
+    if (!prototype)
+        return item;
+    const x = Object.create(prototype);
+    for(const key in item)
+      x[key] = item[key]
+    return x;
+}
+
 export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
     result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any, false, undefined, true))[0], database) };
@@ -81,6 +92,26 @@ export const oEncypt = (item: any, tableBuilder?: TableBuilder<any, string>) => 
     });
     return item;
 }
+
+export const jsonToSqlite = (query: any) => {
+    try {
+      const builder = jsonsql();
+      const sql = builder.build(query);
+      sql.query = sql.query.replace(/\"/g, '');
+      const vArray = [];
+      for (const key in sql.values) {
+        while (sql.query.indexOf('$' + key) !== -1) {
+          sql.query = sql.query.replace('$' + key, '?');
+          vArray.push(sql.values[key]); 
+        }
+      }
+      const sqlResult = { sql: sql.query, args: vArray };
+      return sqlResult;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  };
 
 export const oDecrypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
     if (!tableBuilder)

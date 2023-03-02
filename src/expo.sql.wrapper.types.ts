@@ -5,19 +5,78 @@ export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime
 export type NonFunctionPropertyNames<T> = { [K in keyof T]: T[K] extends Function ? never : K }[keyof T];
 
 export type ITableBuilder<T, D extends string> = {
+    /**
+     * column can contain nullable value 
+     */
     nullable: ITableBuilder<T, D>;
+    /**
+     * isPrimary key
+     */
     primary: ITableBuilder<T, D>;
+    /**
+     * work togather with isPrimary, autoIncrement value on insert
+     */
     autoIncrement: ITableBuilder<T, D>;
+    /**
+     * save method will check if this column value exist in the table, if it dose then it will update insted.
+     * this will only be check if id is not set
+     */
     unique: ITableBuilder<T, D>;
+    /**
+     * column of type boolean
+     */
     boolean: ITableBuilder<T, D>;
+    /**
+     * column of type integer
+     */
     number: ITableBuilder<T, D>;
+    /**
+     * column of type decimal
+     */
     decimal: ITableBuilder<T, D>;
+    /**
+     * column of type string
+     */
     string: ITableBuilder<T, D>;
+    /**
+     * column of type datetime
+     */
     dateTime: ITableBuilder<T, D>;
+    /**
+     * encrypt the column
+     */
     encrypt: (encryptionKey: string) => ITableBuilder<T, D>;
+    /**
+     * add column to table and specify its props there after, eg boolean, number etc 
+     */
     column: (colName: NonFunctionPropertyNames<T>) => ITableBuilder<T, D>;
+    /**
+     * add a foreign key to the table
+     */
     constrain: <E>(columnName: NonFunctionPropertyNames<T>, contraintTableName: D, contraintColumnName: NonFunctionPropertyNames<E>) => ITableBuilder<T, D>;
+    /**
+     * sqlite return json object, with this convert it to class object instead
+     */
     onItemCreate: (func: (item: T) => T) => ITableBuilder<T, D>;
+    /**
+     * if not using onItemCreate then use this to convert json item to class 
+     * note: this will ignore the constructor
+     * example 
+class Test {
+  name: String;
+  passowrd: String;
+  constructor(name: string, passowrd: string){
+    this.name = name;
+    this.passowrd = passowrd;
+  }
+
+  get getName(){
+    return this.name;
+  }
+}
+    .objectPrototype(Test.prototype)
+     */
+    objectPrototype:(objectProptoType: any)=> ITableBuilder<T, D>;
 };
 
 export class IBaseModule<D extends string> {
@@ -130,30 +189,98 @@ export type IQueryResultItem<T, D extends string> = T & {
 
 export interface IDatabase<D extends string> {
     isClosed?: boolean,
-    // Its importend that,createDbContext return new database after this is triggered
-    tryToClose: () => Promise<boolean>,
+    /**
+     * Its importend that,createDbContext return new database after this is triggered
+     */
+    tryToClose: () => Promise<boolean>;
+    /**
+     * Its importend that,createDbContext return new database after this is triggered
+     */
     close: () => Promise<void>;
+    /**
+     * begin transaction
+     */
     beginTransaction: () => Promise<void>;
+    /**
+     * comit the transaction
+     */
     commitTransaction: () => Promise<void>;
+    /**
+     * rollback the transaction
+     */
     rollbackTransaction: () => Promise<void>;
-    // Auto close the db after every ms.
-    // The db will be able to refresh only if there is no db operation is ongoing.
-    // This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time.
-    // its best to use ms:3600000
-    // the db has to be ideal for ms to be able to close it.
+    /**
+    Auto close the db after every ms.
+    The db will be able to refresh only if there is no db operation is ongoing.
+    This is useful, so that it will use less memory as SQlite tends to store transaction in memories which causes the increase in memory over time.
+    its best to use ms:3600000
+    the db has to be ideal for ms to be able to close it.
+    */
     startRefresher: (ms: number) => void;
+    /**
+     * return column name for the specific table
+     */
     allowedKeys: (tableName: D) => Promise<string[]>;
+    /**
+     * convert json to IQueryResultItem object, this will add method as savechanges, update and delete methods to an object
+     */
     asQueryable: <T>(item: T & IBaseModule<D>, tableName?: D) => Promise<IQueryResultItem<T, D>>
     watch: <T>(tableName: D) => IWatcher<T, D>;
+    /**
+     * Create IQuery object.
+     */
     query: <T>(tableName: D) => IQuery<T, D>;
+    /**
+     * execute sql eg
+     * query: select * from users where name = ?
+     * args: ["test"]
+     */
     find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>
+    /**
+     * trigger save, update will depend on id and unique columns
+     */
     save: <T>(item: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) => Promise<T[]>;
     where: <T>(tableName: D, query?: any | T) => Promise<T[]>;
+    /**
+     * this method translate json-sql to sqlite select.
+     * for more info about this read json-sql documentations 
+     * https://github.com/2do2go/json-sql/tree/4be018c0662dacba06ddf033d18e71ebf93ee7c3/docs
+     * example 
+     * {
+        type: 'select',
+        table: 'DetaliItems',
+        condition:{"DetaliItems.id":{$gt: 1}, "DetaliItems.title": "Epic Of Caterpillar"},  
+        join: {
+        Chapters: {
+            on: {'DetaliItems.id': 'Chapters.detaliItem_Id'} 
+            }
+        }
+      }
+     */
+    jsonToSql: <T>(jsonQuery: any, tableName?: D) => Promise<T[]>;
+    /**
+     * delete object based on Id
+     */
     delete: (item: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) => Promise<void>;
+    /**
+     * execute sql without returning anyting
+     */
     execute: (query: string, args?: any[]) => Promise<boolean>;
+    /**
+     * Drop all tables
+     */
     dropTables: () => Promise<void>;
+    /**
+     * Setup your table, this will only create a table if it dose not exist 
+     */
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
+    /**
+     * find out if there some changes between object and db table
+     */
     tableHasChanges: <T>(item: ITableBuilder<T, D>) => Promise<boolean>;
+    /**
+     * execute an array of sql
+     */
     executeRawSql: (queries: SqlLite.Query[], readOnly: boolean) => Promise<void>;
 
 }
