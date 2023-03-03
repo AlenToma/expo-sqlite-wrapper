@@ -1,4 +1,4 @@
-import { NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
+import {IDataBaseExtender, NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
 import { TableBuilder } from './TableStructor';
 import crypto from 'crypto-js'
 import jsonsql from 'json-sql'
@@ -55,9 +55,6 @@ export const createQueryResultType = async function <T, D extends string>(item: 
     return result;
 }
 
-type IDataBaseExtender<D extends string> = {
-    tables: TableBuilder<any, D>[];
-} & IDatabase<D>
 
 export const translateToSqliteValue = (v: any) => {
     if (v === null || v === undefined)

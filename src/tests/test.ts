@@ -1,6 +1,7 @@
 import 'should'
 import mocha from 'mocha'
 import { createQueryResultType, Query, jsonToSqlite, encrypt, decrypt } from '../SqlQueryBuilder';
+import BulkSave from '../BulkSave';
 import TableBuilder from '../TableStructor'
 import crypto from 'crypto-js'
 interface Test {
@@ -30,11 +31,14 @@ mocha.describe("encryptions", function () {
 });
 
 mocha.describe("readEncryption", function () {
+    console.log("readEncryption")
     var q = new Query<Test, TableName>("Test", database);
     q.Column("password").EqualTo("test").AND().Column("name").EqualTo("hey").Limit(100).OrderByAsc("name").getQueryResult("SELECT").sql.trim().should.eql("SELECT * FROM Test  WHERE password = ? AND name = ? Limit 100 Order By name ASC")
     q.Column("password").EqualTo("test").AND().Column("name").EqualTo("hey").Limit(100).OrderByAsc("name").getQueryResult("SELECT").values[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==")
     q.Column("password").EqualTo("test").AND().Column("name").EqualTo("hey").Limit(100).OrderByAsc("name").getQueryResult("SELECT").values[1].should.eql("hey")
 });
+
+
 
 mocha.describe("JsonToSql", function () {
 
@@ -51,6 +55,21 @@ mocha.describe("JsonToSql", function () {
 
     sql.sql.trim().should.eql("select * from DetaliItems join Chapters on DetaliItems.id = Chapters.detaliItem_Id where DetaliItems.id > 1 and DetaliItems.title = ?;")
 });
+
+mocha.describe("bulkSaveWithEncryptionsInsert", function () {
+    console.log("bulkSaveWithEncryptionsInsert")
+    const b = new BulkSave<Test, TableName>(database, ["name", "password"], "Test").insert(item as any);
+    b.quries[0].args[1].should.eql("#dbEncrypted&R9e01Yx38fEBCU6PBNsWZQ==")
+    b.quries[0].args[0].should.eql(item.name)
+});
+
+mocha.describe("bulkSaveWithEncryptionsUpdate", function () {
+    console.log("bulkSaveWithEncryptionsUpdate");
+    const b = new BulkSave<Test, TableName>(database, ["name", "password"], "Test").update(item as any);
+    b.quries[0].args[1].should.eql("#dbEncrypted&R9e01Yx38fEBCU6PBNsWZQ==");
+    b.quries[0].args[0].should.eql(item.name);
+});
+
 
 mocha.describe("DeleteWthLimit", function () {
 

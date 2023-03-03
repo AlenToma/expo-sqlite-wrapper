@@ -1,4 +1,5 @@
 import * as SqlLite from 'expo-sqlite'
+import { TableBuilder } from './TableStructor';
 import BulkSave from './BulkSave';
 
 export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime";
@@ -96,6 +97,9 @@ export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
 export declare type StringValue = string | undefined;
 
+export type IDataBaseExtender<D extends string> = {
+    tables: TableBuilder<any, D>[];
+} & IDatabase<D>
 
 export interface IChildQueryLoader<T, B, D extends string> {
     With: <E>(columnName: NonFunctionPropertyNames<E>) => IChildQueryLoader<T, B, D>;
