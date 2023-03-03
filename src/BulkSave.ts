@@ -57,7 +57,7 @@ export default class BulkSave<T, D extends string> {
                     v = v === true ? 1 : 0;
                 q.args.push(v);
             });
-
+            q.args.push(item.id);
             this.quries.push(q);
         });
         return this;

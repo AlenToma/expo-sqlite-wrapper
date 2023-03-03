@@ -25,6 +25,7 @@ export class Parent extends IBaseModule<TableNames>{
     return TableBuilder<Parent, TableNames>("Parents").
     column("id").primary.autoIncrement.number.
     column("name").
+    objectPrototype(Parent.prototype).
     //unique acts as an Id too as the library will chack if there exist an item with the same field value and will update instead.
     column("email").unique;
   }
@@ -85,6 +86,8 @@ With this we are done with our modules.
 `unique` the column act as and id, this is only apply when you are using the library `save` to insert or update your items.
 
 `encrypt(encryptionKey)` incrypt the data in the column, this is only applied for string types.
+
+`objectPrototype()` instead of using `onItemCreate` you could use this instead to convert json item to a `class`
 
 `onItemCreate(func)` the data gets returned as json from the db, you could use this prop to convert it to a `class`
 
