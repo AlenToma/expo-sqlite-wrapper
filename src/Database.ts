@@ -24,7 +24,7 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
 class Database<D extends string> implements IDatabase<D> {
     private mappedKeys: Map<D, string[]>;
     private dataBase: () => Promise<SQLite.WebSQLDatabase>;
-    private tables: TableBuilder<any, D>[];
+    public tables: TableBuilder<any, D>[];
     private timeout: any = undefined;
     private static dbIni: boolean = false;
     private onInit?: (database: IDatabase<D>) => Promise<void>;

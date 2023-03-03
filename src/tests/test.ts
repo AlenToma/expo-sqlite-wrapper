@@ -1,23 +1,40 @@
 import 'should'
 import mocha from 'mocha'
-import { createQueryResultType, Query, jsonToSqlite } from '../SqlQueryBuilder';
+import { createQueryResultType, Query, jsonToSqlite, encrypt, decrypt } from '../SqlQueryBuilder';
+import TableBuilder from '../TableStructor'
+import crypto from 'crypto-js'
 interface Test {
     name: string;
     id: number;
+    password: string;
 }
 
 type TableName = "Test"
 
 const database = {
     delete: async () => { },
-    save: async () => { }
+    save: async () => { },
+    tables: [TableBuilder<Test, TableName>("Test").column("id").number.primary.autoIncrement.column("name").column("password").encrypt("testEncryptions")]
 } as any
 
 const item = {
     name: "test 1",
-    id: 1
+    id: 1, 
+    password: "test hahaha"
 } as Test
 
+mocha.describe("encryptions", function () {
+    const en = encrypt("test", "123")
+    const dec = decrypt(en, "123");
+    dec.should.eql("test")
+});
+
+mocha.describe("readEncryption", function () {
+    var q = new Query<Test, TableName>("Test", database);
+    q.Column("password").EqualTo("test").AND().Column("name").EqualTo("hey").Limit(100).OrderByAsc("name").getQueryResult("SELECT").sql.trim().should.eql("SELECT * FROM Test  WHERE password = ? AND name = ? Limit 100 Order By name ASC")
+    q.Column("password").EqualTo("test").AND().Column("name").EqualTo("hey").Limit(100).OrderByAsc("name").getQueryResult("SELECT").values[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==")
+    q.Column("password").EqualTo("test").AND().Column("name").EqualTo("hey").Limit(100).OrderByAsc("name").getQueryResult("SELECT").values[1].should.eql("hey")
+});
 
 mocha.describe("JsonToSql", function () {
 

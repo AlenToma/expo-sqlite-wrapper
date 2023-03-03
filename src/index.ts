@@ -1,7 +1,8 @@
-import { IBaseModule, SingleValue, ArrayValue,StringValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher , ColumnType} from './expo.sql.wrapper.types'
+import { IBaseModule, SingleValue, ArrayValue, StringValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher, ColumnType, } from './expo.sql.wrapper.types'
 import createDbContext from './Database'
 import TableBuilder from './TableStructor'
 import BulkSave from './BulkSave'
+import { encrypt, decrypt, oEncypt, oDecrypt } from './SqlQueryBuilder'
 
 
 export default createDbContext
@@ -9,7 +10,12 @@ export default createDbContext
 export {
     TableBuilder,
     ColumnType,
-    IBaseModule
+    IBaseModule,
+    BulkSave,
+    encrypt,
+    decrypt,
+    oDecrypt,
+    oEncypt
 }
 export type {
     SingleValue,
@@ -19,6 +25,5 @@ export type {
     IQuery,
     IQueryResultItem,
     IDatabase,
-    IWatcher,
-    BulkSave
+    IWatcher
 }

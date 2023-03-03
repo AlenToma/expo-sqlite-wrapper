@@ -3,12 +3,12 @@ import { TableBuilder } from './TableStructor';
 import crypto from 'crypto-js'
 import jsonsql from 'json-sql'
 
-export const CreateSqlInstaceOfType=(prototype: any, item: any) =>{
+export const CreateSqlInstaceOfType = (prototype: any, item: any) => {
     if (!prototype)
         return item;
     const x = Object.create(prototype);
-    for(const key in item)
-      x[key] = item[key]
+    for (const key in item)
+        x[key] = item[key]
     return x;
 }
 
@@ -55,6 +55,10 @@ export const createQueryResultType = async function <T, D extends string>(item: 
     return result;
 }
 
+type IDataBaseExtender<D extends string> = {
+    tables: TableBuilder<any, D>[];
+} & IDatabase<D>
+
 export const translateToSqliteValue = (v: any) => {
     if (v === null || v === undefined)
         return v;
@@ -62,6 +66,17 @@ export const translateToSqliteValue = (v: any) => {
         return (v as Date).toISOString();
     if (typeof v === "boolean")
         return v === true ? 1 : 0;
+    return v;
+}
+
+export const translateAndEncrypt = (v: any, database: IDataBaseExtender<string>, tableName: string, column?: string) => {
+    const table = database.tables.find(x => x.tableName == tableName);
+    const encryptValue = typeof v === "string" && column && table && table.props.find(f => f.columnName === column && f.encryptionKey) != undefined;
+    v = translateToSqliteValue(v);
+    if (encryptValue) {
+        v = encrypt(v, table.props.find(x => x.columnName === column).encryptionKey);
+    }
+
     return v;
 }
 
@@ -78,8 +93,8 @@ const encryptionsIdentifier = "#dbEncrypted&";
 export const encrypt = (str: string, key: string) => {
     if (!str || str == "" || str.startsWith(encryptionsIdentifier))
         return str; // already Encrypted
-
-    return encryptionsIdentifier + crypto.AES.encrypt(str, key).toString();
+    const hash = crypto.SHA256(key);
+    return encryptionsIdentifier + crypto.AES.encrypt(str, hash, { mode: crypto.mode.ECB }).toString();
 }
 
 export const oEncypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
@@ -95,23 +110,23 @@ export const oEncypt = (item: any, tableBuilder?: TableBuilder<any, string>) => 
 
 export const jsonToSqlite = (query: any) => {
     try {
-      const builder = jsonsql();
-      const sql = builder.build(query);
-      sql.query = sql.query.replace(/\"/g, '');
-      const vArray = [];
-      for (const key in sql.values) {
-        while (sql.query.indexOf('$' + key) !== -1) {
-          sql.query = sql.query.replace('$' + key, '?');
-          vArray.push(sql.values[key]); 
+        const builder = jsonsql();
+        const sql = builder.build(query);
+        sql.query = sql.query.replace(/\"/g, '');
+        const vArray = [];
+        for (const key in sql.values) {
+            while (sql.query.indexOf('$' + key) !== -1) {
+                sql.query = sql.query.replace('$' + key, '?');
+                vArray.push(sql.values[key]);
+            }
         }
-      }
-      const sqlResult = { sql: sql.query, args: vArray };
-      return sqlResult;
+        const sqlResult = { sql: sql.query, args: vArray };
+        return sqlResult;
     } catch (e) {
-      console.error(e);
-      throw e;
+        console.error(e);
+        throw e;
     }
-  };
+};
 
 export const oDecrypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
     if (!tableBuilder)
@@ -128,8 +143,9 @@ export const oDecrypt = (item: any, tableBuilder?: TableBuilder<any, string>) =>
 export const decrypt = (str: string, key: string) => {
     if (!str || str == "" || !str.startsWith(encryptionsIdentifier))
         return str;
+    const hash = crypto.SHA256(key);
     str = str.substring(encryptionsIdentifier.length)
-    const bytes = crypto.AES.decrypt(str, key);
+    const bytes = crypto.AES.decrypt(str, hash, { mode: crypto.mode.ECB });
     const originalText = bytes.toString(crypto.enc.Utf8);
     return originalText;
 }
@@ -175,8 +191,16 @@ class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B
 }
 
 const isFunc = (value: any) => {
+    if (value === null || value === undefined || value.toString === undefined)
+        return false;
     return value.toString().indexOf('function') !== -1;
 };
+
+const isColumnFunc = (value: any) => {
+    if (isFunc(value) && value.toString().indexOf("_column ") !== -1)
+        return true;
+    return false;
+}
 
 export const getColumns = (fn: any) => {
     if (!isFunc(fn))
@@ -188,19 +212,20 @@ export const getColumns = (fn: any) => {
     if (str.indexOf('[') !== -1) {
         str = str.substring(str.indexOf('[') + 1);
     }
-    str = str.replace(/\]|'|"|\+|return|;|\.|\}|\{|\(|\)|function| /gim, '').replace(/\r?\n|\r/g, "");
+    str = str.replace(/\]|'|"|\+|return|;|\.|\}|\{|\(|\)|function|_column| /gim, '').replace(/\r?\n|\r/g, "");
     return str;
 }
+
 
 export class Query<T, D extends string> implements IQuery<T, D>{
     Queries: any[] = [];
     tableName: D;
     Children: IChildLoader<D>[] = [];
-    database: IDatabase<D>;
+    database: IDataBaseExtender<D>;
 
     private currentIndex: number = 0;
     constructor(tableName: D, database: IDatabase<D>) {
-        this.database = database;
+        this.database = database as any;
         this.tableName = tableName;
     }
 
@@ -208,6 +233,18 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
     private hasNext(queries: any[]) {
         return queries.length > 0 && this.currentIndex < queries.length;
+    }
+
+    private prevColumn(queries: any[]) {
+        for (let i = this.currentIndex; i >= this.currentIndex-3; i--) {
+            if (i<0)
+                return undefined;
+            const v = queries[i];
+            if (isColumnFunc(v))
+                return getColumns(v);
+        }
+
+        return undefined;
     }
 
     private prevValue(queries: any[]) {
@@ -337,7 +374,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
     //#region public Methods
     Column(columnName: NonFunctionPropertyNames<T>) {
-        this.Queries.push("function " + columnName.toString());
+        this.Queries.push("_column function " + columnName.toString());
         return this;
     }
 
@@ -515,7 +552,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
 
 
         const translate = (value: any) => {
-            var pValue = this.prevValue(queries);
+            const pValue = this.prevValue(queries);
             switch (value) {
                 case Param.StartParameter:
                 case Param.EqualTo:
@@ -551,25 +588,27 @@ export class Query<T, D extends string> implements IQuery<T, D>{
                     if (isFunc(value)) appendSql(getColumns(value) ?? '');
                     else if (value.queryValue !== undefined && (pValue === Param.IN || pValue == Param.NotIn)
                     ) {
+                        const prevColumn = this.prevColumn(queries);
                         var v = Array.isArray(value.queryValue)
                             ? (value.queryValue as any[])
                             : [value.queryValue];
                         appendSql(`( ${v.map((x) => '?').join(',')} )`);
                         v.forEach((x) => {
-                            if (x !== undefined) result.values.push(translateToSqliteValue(x));
+                            if (x !== undefined) result.values.push(translateAndEncrypt(x, this.database, this.tableName, prevColumn));
                         });
                     } else if (value.queryValue !== undefined) {
+                        const prevColumn = this.prevColumn(queries);
                         if (pValue == Param.Contains || pValue == Param.StartWith || pValue == Param.EndWith) {
                             if (pValue == Param.Contains)
-                                value = { queryValue: `%${translateToSqliteValue(value.queryValue)}%` }
+                                value = { queryValue: `%${translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}%` }
                             else if (pValue == Param.StartWith)
-                                value = { queryValue: `${translateToSqliteValue(value.queryValue)}%` }
-                            else value = { queryValue: `%${translateToSqliteValue(value.queryValue)}` }
-                        } else value.queryValue = translateToSqliteValue(value.queryValue)
+                                value = { queryValue: `${translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}%` }
+                            else value = { queryValue: `%${translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}` }
+                        } else value.queryValue = translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)
 
                         appendSql('?');
                         if (Array.isArray(value.queryValue))
-                            value.queryValue = (value.queryValue as []).map(x=> translateToSqliteValue(x)).join(',');
+                            value.queryValue = (value.queryValue as []).map(x => translateAndEncrypt(x, this.database, this.tableName, prevColumn)).join(',');
                         result.values.push(value.queryValue);
                     }
                 }
