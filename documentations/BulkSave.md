@@ -14,7 +14,7 @@ const itemsToRemove = [...]
 const bulkSave = await dbContext.database.bulkSave<Parent>("Parents");
 itemsToAdd.forEach(x=> bulkSave.insert(x));
 itemsToUpdate.forEach(x=> bulkSave.update(x));
-itemsToUpdate.forEach(x=> bulkSave.delete(x));
+itemsToRemove.forEach(x=> bulkSave.delete(x));
 // execute will send all the queries to the database
 await itemToUpdate.execute();
 
