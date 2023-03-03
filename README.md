@@ -50,6 +50,12 @@ export interface IQuery<T, D extends string> {
 ### IDatabase
 ```ts
 export interface IDatabase<D extends string> {
+     /**
+     * BulkSave object
+     * this will not trigger watchers.
+     */
+    bulkSave: <T>(tabelName: D) => Promise<BulkSave<T, D>>;
+    
     isClosed?: boolean;
     /**
      * Its importend that,createDbContext return new database after this is triggered

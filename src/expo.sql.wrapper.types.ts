@@ -1,4 +1,5 @@
 import * as SqlLite from 'expo-sqlite'
+import BulkSave from './BulkSave';
 
 export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime";
 
@@ -76,7 +77,7 @@ class Test {
 }
     .objectPrototype(Test.prototype)
      */
-    objectPrototype:(objectProptoType: any)=> ITableBuilder<T, D>;
+    objectPrototype: (objectProptoType: any) => ITableBuilder<T, D>;
 };
 
 export class IBaseModule<D extends string> {
@@ -188,6 +189,12 @@ export type IQueryResultItem<T, D extends string> = T & {
 
 
 export interface IDatabase<D extends string> {
+    /**
+     * BulkSave object
+     * this will not trigger watchers.
+     */
+    bulkSave: <T>(tabelName: D) => Promise<BulkSave<T, D>>;
+
     isClosed?: boolean,
     /**
      * Its importend that,createDbContext return new database after this is triggered

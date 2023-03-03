@@ -3,6 +3,7 @@ import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecr
 import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 import { ResultSet } from 'expo-sqlite';
+import BulkSave from './BulkSave';
 
 export default function <D extends string>(databaseTables: ITableBuilder<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
     return new Database<D>(databaseTables, getDatabase, onInit, disableLog) as IDatabase<D>;
@@ -533,6 +534,11 @@ class Database<D extends string> implements IDatabase<D> {
             }
         }) as Promise<boolean>;
     };
+
+    async bulkSave<T>(tableName: D) {
+        const item = new BulkSave<T, D>(this as IDatabase<D>, await this.allowedKeys(tableName), tableName);
+        return item;
+    }
 
     //#endregion
 

@@ -1,6 +1,7 @@
 import { IBaseModule, SingleValue, ArrayValue,StringValue, NumberValue, IQuery, IQueryResultItem, IDatabase, IWatcher , ColumnType} from './expo.sql.wrapper.types'
 import createDbContext from './Database'
 import TableBuilder from './TableStructor'
+import BulkSave from './BulkSave'
 
 
 export default createDbContext
@@ -18,5 +19,6 @@ export type {
     IQuery,
     IQueryResultItem,
     IDatabase,
-    IWatcher
+    IWatcher,
+    BulkSave
 }
