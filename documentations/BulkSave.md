@@ -16,6 +16,6 @@ itemsToAdd.forEach(x=> bulkSave.insert(x));
 itemsToUpdate.forEach(x=> bulkSave.update(x));
 itemsToRemove.forEach(x=> bulkSave.delete(x));
 // execute will send all the queries to the database
-await itemToUpdate.execute();
+await bulkSave.execute();
 
 ```
