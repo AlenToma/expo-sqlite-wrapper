@@ -87,7 +87,7 @@ With this we are done with our modules.
 
 `encrypt(encryptionKey)` incrypt the data in the column, this is only applied for string types.
 
-`objectPrototype()` instead of using `onItemCreate` you could use this instead to convert json item to a `class`
+`objectPrototype()` instead of using `onItemCreate` you could use this instead to convert json item to a `class`. Note that it will skip the contructor call
 
 `onItemCreate(func)` the data gets returned as json from the db, you could use this prop to convert it to a `class`
 
