@@ -25,15 +25,19 @@ class User extends IBaseModule<TableNames>{
 
 ```
 `Save` method will make sure to `encrypt` the above column before inserting and updating the database.
+
 `find` method will make sure to `decrypt` the data before retuning the data to the user.
 
 ## Searching
 To be able to search those column, you have tow diffrent ways. 
-1- using IQuery to seach as it will make sure to encrypt your seach when it is send to the database
-2- manually encrypt your seach and compaire it.
+
+1- Using `IQuery` to search as it will make sure to encrypt your search when it is send to the database
+
+2- Manually encrypt your search and compare it.
+
 ### example 1
 ```ts
-  // 123 will be encrypted so it could be compaire to the value in the database
+  // 123 will be encrypted so it could be compare to the value in the database
   var item = await dbContext.database.query<User>("Users").column("password").EqualTo("123").toList();
 
 ```
