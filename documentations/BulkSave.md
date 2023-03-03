@@ -9,12 +9,12 @@ Note: `BulkSave` will not trigger `Watchers`
 ```ts
 const dbContext = new DbContext();
 const itemsToAdd =[...]
-const itemToUpdate = [....]
-const itemToRemove = [...]
+const itemsToUpdate = [....]
+const itemsToRemove = [...]
 const bulkSave = await dbContext.database.bulkSave<Parent>("Parents");
 itemsToAdd.forEach(x=> bulkSave.insert(x));
-itemToUpdate.forEach(x=> bulkSave.update(x));
-itemToUpdate.forEach(x=> itemToRemove.delete(x));
+itemsToUpdate.forEach(x=> bulkSave.update(x));
+itemsToUpdate.forEach(x=> bulkSave.delete(x));
 // execute will send all the queries to the database
 await itemToUpdate.execute();
 
