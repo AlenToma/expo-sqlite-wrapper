@@ -12,6 +12,7 @@ Installation for `expo-sqlite` read https://docs.expo.dev/versions/latest/sdk/sq
 * [DbContext](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/dbContexts.md)
 * [select and save operations](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Select_and_Save.md)
 * [Watch the db operations](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Watcher.md)
+* [BulkSave](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/BulkSave.md)
 
 ### IQuery
 ```js
