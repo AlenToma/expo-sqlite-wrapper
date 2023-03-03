@@ -3,6 +3,7 @@ When saving many data, it is best to skip some operation that `save` operation d
 
 That is why there is a simple way `expo-sqlite-wrapper` present (`BulkSave`)
 
+Note: `BulkSave` will not trigger `Watchers`
 ## example
 
 ```ts
