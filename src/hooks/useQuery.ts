@@ -67,14 +67,13 @@ const UseQuery = <T extends IId<D>, D extends string>(
             else {
                 setIsLoading(true);
                 items = [...items, ...(dataRef.current.filter(x => !items.find(a => a.id == x.id)))];
-                const itemsAdded = onItemChange(items).sort((a, b) => a.id - b.id);
+                const itemsAdded = onItemChange(items);
                 const r = [] as IQueryResultItem<T, D>[];
                 for (const x of itemsAdded) {
                     r.push(await createQueryResultType(x, dbContext));
                 }
                 dataRef.current = r;
                 update();
-
                 setIsLoading(false);
             }
         } catch (e) {
