@@ -1,4 +1,4 @@
-import {IDataBaseExtender, NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue } from './expo.sql.wrapper.types'
+import { IDataBaseExtender, NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue, IId } from './expo.sql.wrapper.types'
 import { TableBuilder } from './TableStructor';
 import crypto from 'crypto-js'
 import jsonsql from 'json-sql'
@@ -12,7 +12,11 @@ export const CreateSqlInstaceOfType = (prototype: any, item: any) => {
     return x;
 }
 
-export const createQueryResultType = async function <T, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
+export const getAvailableKeys = (dbKeys: string[], item: any) => {
+    return dbKeys.filter(x => Object.keys(item).includes(x));
+}
+
+export const createQueryResultType = async function <T extends IId<D>, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
     var result = (item as any) as IQueryResultItem<T, D>;
     result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any, false, undefined, true))[0], database) };
     result.update = async (...keys: any[]) => {
@@ -105,6 +109,41 @@ export const oEncypt = (item: any, tableBuilder?: TableBuilder<any, string>) => 
     return item;
 }
 
+export const translateSimpleSql = (database: any, tableName: string, query?: any) => {
+    var q = `SELECT * FROM ${tableName} ${query ? 'WHERE ' : ''}`;
+    var values = [] as any[];
+    if (query && Object.keys(query).length > 0) {
+        const table = database.tables.find(x => x.tableName == tableName);
+        const keys = Object.keys(query);
+        keys.forEach((x, i) => {
+            var start = x.startsWith('$') ? x.substring(0, x.indexOf('-')).replace('-', '') : undefined;
+            const columnName = start ? x.replace("$in-", "").trim() : x.trim();
+            const column = table ? table.props.find(f => f.columnName === columnName) : undefined;
+            if (!start) {
+                q += x + '=? ' + (i < keys.length - 1 ? 'AND ' : '');
+                let v = query[x];
+                if (column)
+                    v = translateAndEncrypt(v, database, tableName, columnName);
+                values.push(v);
+            } else {
+                if (start == '$in') {
+                    let v = query[x] as [];
+                    q += x.replace("$in-", "") + ' IN (';
+                    v.forEach((item: any, index) => {
+                        q += '?' + (index < v.length - 1 ? ', ' : '');
+                        if (column)
+                            item = translateAndEncrypt(item, database, tableName, columnName);
+                        values.push(item);
+                    });
+                }
+                q += ') ' + (i < keys.length - 1 ? 'AND ' : '');
+            }
+        });
+    }
+
+    return { sql: q, args: values };
+}
+
 export const jsonToSqlite = (query: any) => {
     try {
         const builder = jsonsql();
@@ -148,13 +187,13 @@ export const decrypt = (str: string, key: string) => {
 }
 
 
-export const validateTableName = function <T, D extends string>(item: IBaseModule<D>, tableName?: D) {
-    if (!item.tableName || item.tableName.length <= 2)
+export const validateTableName = function <T extends IId<D>, D extends string>(item: T, tableName?: D) {
+    if (!(item as any).tableName || (item as any).tableName.length <= 2)
         if (!tableName)
             throw "TableName cannot be null, This item could not be saved"
-        else item.tableName = tableName;
+        else (item as any).tableName = tableName;
 
-    return item;
+    return (item as any) as IBaseModule<D>;
 }
 
 export const single = function <T>(items: any[]) {
@@ -165,7 +204,7 @@ export const single = function <T>(items: any[]) {
 
 
 
-class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B, D> {
+class ChildQueryLoader<T, B extends IId<D>, D extends string> implements IChildQueryLoader<T, B, D> {
     private parent: Query<B, D>;
     private tableName: D;
     constructor(parent: Query<B, D>, tableName: D) {
@@ -187,9 +226,11 @@ class ChildQueryLoader<T, B, D extends string> implements IChildQueryLoader<T, B
     }
 }
 
-const isFunc = (value: any) => {
+export const isFunc = (value: any) => {
     if (value === null || value === undefined || value.toString === undefined)
         return false;
+    if (typeof value === "function")
+        return true;
     return value.toString().indexOf('function') !== -1;
 };
 
@@ -214,7 +255,7 @@ export const getColumns = (fn: any) => {
 }
 
 
-export class Query<T, D extends string> implements IQuery<T, D>{
+export class Query<T extends IId<D>, D extends string> implements IQuery<T, D>{
     Queries: any[] = [];
     tableName: D;
     Children: IChildLoader<D>[] = [];
@@ -233,8 +274,8 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
     private prevColumn(queries: any[]) {
-        for (let i = this.currentIndex; i >= this.currentIndex-3; i--) {
-            if (i<0)
+        for (let i = this.currentIndex; i >= this.currentIndex - 3; i--) {
+            if (i < 0)
                 return undefined;
             const v = queries[i];
             if (isColumnFunc(v))
@@ -480,7 +521,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
         return this;
     }
 
-    LoadChildren<B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) {
+    LoadChildren<B extends IId<D>>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) {
         var item = {
             parentProperty: parentProperty,
             parentTable: this.tableName,
@@ -494,7 +535,7 @@ export class Query<T, D extends string> implements IQuery<T, D>{
     }
 
 
-    LoadChild<B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) {
+    LoadChild<B extends IId<D>>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) {
         var item = {
             parentProperty: parentProperty,
             parentTable: this.tableName,

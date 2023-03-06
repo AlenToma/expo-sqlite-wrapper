@@ -1,9 +1,10 @@
-import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder } from './expo.sql.wrapper.types'
-import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt, isDate, CreateSqlInstaceOfType, jsonToSqlite } from './SqlQueryBuilder'
+import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder, IUseQuery, IQueryResultItem, SOperation, TempStore, WatchIdentifier, IId } from './expo.sql.wrapper.types'
+import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt, isDate, CreateSqlInstaceOfType, jsonToSqlite, translateAndEncrypt, translateSimpleSql, getAvailableKeys } from './SqlQueryBuilder'
 import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 import { ResultSet } from 'expo-sqlite';
 import BulkSave from './BulkSave';
+import UseQuery from './hooks/useQuery'
 
 export default function <D extends string>(databaseTables: ITableBuilder<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
     return new Database<D>(databaseTables, getDatabase, onInit, disableLog) as IDatabase<D>;
@@ -14,10 +15,13 @@ class Watcher<T, D extends string> implements IWatcher<T, D> {
     tableName: D;
     onSave?: (item: T[], operation: Operation) => Promise<void>;
     onDelete?: (item: T[]) => Promise<void>;
+    onBulkSave?: () => Promise<void>;
     readonly removeWatch: () => void;
+    identifier: WatchIdentifier;
     constructor(tableName: D) {
         this.removeWatch = () => watchers.splice(watchers.findIndex(x => x == this), 1);
         this.tableName = tableName;
+        this.identifier = "Other"
     }
 }
 
@@ -37,6 +41,9 @@ class Database<D extends string> implements IDatabase<D> {
     private operations: Map<string, boolean>;
     private refresherSettings?: { ms: number } | undefined;
     private disableLog?: boolean;
+    private _disableWatchers?: boolean;
+    private _disableHooks?: boolean;
+    private tempStore: TempStore<D>[];
     constructor(databaseTables: ITableBuilder<any, D>[],
         getDatabase: () => Promise<SQLite.WebSQLDatabase>,
         onInit?: (database: IDatabase<D>) => Promise<void>,
@@ -48,6 +55,7 @@ class Database<D extends string> implements IDatabase<D> {
         this.timer = undefined;
         this.transacting = false;
         this.operations = new Map();
+        this.tempStore = [];
         this.dataBase = async () => {
             while (this.isClosing)
                 await this.wait();
@@ -62,6 +70,7 @@ class Database<D extends string> implements IDatabase<D> {
         this.tables = databaseTables as TableBuilder<any, D>[];
     }
 
+
     private log(...items: any[]) {
         if (!this.disableLog)
             console.log(items);
@@ -71,6 +80,14 @@ class Database<D extends string> implements IDatabase<D> {
         if (!this.disableLog)
             console.info(items);
     }
+
+    //#region Hooks 
+
+    public useQuery<T extends IId<D>, D extends string>(tableName: D, query: (IQuery<T, D>) | (SQLite.Query) | (() => Promise<T[]>), onDbItemChanged?: (items: T[]) => T[]) {
+        return UseQuery(query as any, this as any, tableName, onDbItemChanged) as any;
+    }
+
+    //#endregion Hooks
 
     //#region private methods
 
@@ -85,25 +102,92 @@ class Database<D extends string> implements IDatabase<D> {
         return this.transacting === true;
     }
 
-    private async triggerWatch<T>(items: T | T[], operation: "onSave" | "onDelete", subOperation?: Operation, tableName?: D) {
-        var tItems = Array.isArray(items) ? items : [items];
-        var s = single(tItems) as any;
-        if (!tableName && s && s.tableName)
-            tableName = s.tableName
-        if (!tableName)
-            return;
-        const w = watchers.filter(x => {
-            var watcher = x as Watcher<T, D>;
-            return watcher.tableName == tableName;
-        }) as Watcher<T, D>[];
+    private AddToTempStore(items: IBaseModule<D>[], operation: SOperation, subOperation?: Operation, tableName?: D, identifier?: WatchIdentifier) {
+        try {
+            let store = this.tempStore.find(x => x.tableName === tableName && x.operation === operation && x.subOperation === subOperation && x.identifier === identifier);
+            if (store === undefined) {
+                store = {
+                    operation: operation,
+                    subOperation: subOperation,
+                    tableName: tableName,
+                    items: [...items],
+                    identifier: identifier
+                }
+                this.tempStore.push(store);
+            } else {
+                items.forEach(x => {
+                    if (!store.items.find(a => a.id === x.id))
+                        store.items.push(x);
+                });
+            }
+        } catch (e) {
+            console.error(e);
+        }
 
+    }
 
-        for (var watcher of w) {
-            if (operation === "onSave" && watcher.onSave)
-                await watcher.onSave(tItems, subOperation ?? "INSERT");
+    private async executeStore(identifier: WatchIdentifier) {
+        for (let item of this.tempStore.filter(x => x.identifier === identifier).sort((a, b) => {
+            if (a.operation !== "onBulkSave")
+                return -1;
+            if (b.operation !== "onBulkSave")
+                return 1;
+            return 0;
+        })) {
+            await this.triggerWatch(item.items, item.operation, item.subOperation, item.tableName, item.identifier);
+        }
 
-            if (operation === "onDelete" && watcher.onDelete)
-                await watcher.onDelete(tItems);
+        this.tempStore = this.tempStore.filter(x => x.identifier !== identifier);
+    }
+
+    public async triggerWatch<T extends IBaseModule<D>>(items: T | T[], operation: SOperation, subOperation?: Operation, tableName?: D, identifier?: WatchIdentifier) {
+        try {
+            const tItems = Array.isArray(items) ? items : [items];
+            var s = single(tItems) as any;
+            if (s && !tableName && s && s.tableName)
+                tableName = s.tableName;
+            if (!tableName)
+                return;
+            const w = watchers.filter(x => {
+                const watcher = x as Watcher<T, D>;
+                return watcher.tableName == tableName && (identifier === undefined || identifier === x.identifier);
+            }) as Watcher<T, D>[];
+
+            for (let watcher of w) {
+                try {
+                    if (this._disableWatchers && watcher.identifier !== "Hook") {
+                        // this.info("Watcher is Frozen", operation);
+                        this.AddToTempStore(tItems, operation, subOperation, tableName, "Other");
+                        continue;
+                    }
+
+                    if (this._disableHooks && watcher.identifier === "Hook") {
+                        // this.info("Hook is Frozen", operation);
+                        this.AddToTempStore(tItems, operation, subOperation, tableName, "Hook");
+                        continue;
+                    }
+
+                    if (operation === "onSave" && watcher.onSave) {
+                        // this.info("Call Watcher", operation);
+                        await watcher.onSave(tItems, subOperation ?? "INSERT");
+                    }
+
+                    if (operation === "onDelete" && watcher.onDelete) {
+                        //  this.info("Call Watcher", operation);
+                        await watcher.onDelete(tItems);
+                    }
+
+                    if (operation === "onBulkSave" && watcher.onBulkSave) {
+                        // this.info("Call Watcher", operation);
+                        await watcher.onBulkSave();
+                    }
+                } catch (e) {
+                    console.error("Watchers.Error:", operation, subOperation, tableName, e);
+                }
+            }
+        }
+        catch (e) {
+            console.error("Watchers.Error:", e);
         }
     }
 
@@ -120,11 +204,10 @@ class Database<D extends string> implements IDatabase<D> {
                 this.operations.set(key, true);
                 this.log('Executing Save...');
                 const uiqueItem = await this.getUique(item);
-                const keys = (await this.allowedKeys(item.tableName, true)).filter((x) => Object.keys(item).includes(x));
+                const keys = getAvailableKeys(await this.allowedKeys(item.tableName, true), item);
                 const sOperations = uiqueItem ? "UPDATE" : "INSERT";
                 let query = '';
                 let args = [] as any[];
-                oEncypt(item);
                 if (uiqueItem) {
                     if (insertOnly) {
                         resolve(item as any);
@@ -148,10 +231,7 @@ class Database<D extends string> implements IDatabase<D> {
                 }
                 keys.forEach((k: string, i) => {
                     let v = (item as any)[k] ?? null;
-                    if (isDate(v))
-                        v = v.toISOString();
-                    if (typeof v === "boolean")
-                        v = v === true ? 1 : 0;
+                    v = translateAndEncrypt(v, this as any, item.tableName, k);
                     args.push(v);
                 });
                 if (uiqueItem)
@@ -163,7 +243,6 @@ class Database<D extends string> implements IDatabase<D> {
                     const lastItem = ((await this.selectLastRecord<IBaseModule<D>>(item)) ?? item);
                     item.id = lastItem.id;
                 }
-                oDecrypt(item);
                 this.operations.delete(key);
                 await this.triggerWatch(item, "onSave", sOperations, tableName);
                 resolve(item as any as T);
@@ -229,6 +308,26 @@ class Database<D extends string> implements IDatabase<D> {
     //#endregion
 
     //#region public Methods for Select
+
+    public disableWatchers() {
+        this._disableWatchers = true;
+        return this;
+    }
+
+    public async enableWatchers() {
+        this._disableWatchers = false;
+        await this.executeStore("Other");
+    }
+
+    public disableHooks() {
+        this._disableHooks = true;
+        return this;
+    }
+
+    public async enableHooks() {
+        this._disableHooks = false;
+        await this.executeStore("Hook");
+    }
 
     public async beginTransaction() {
         this.resetRefresher();
@@ -314,6 +413,7 @@ class Database<D extends string> implements IDatabase<D> {
         return new Promise(async (resolve, reject) => {
             (await this.dataBase()).exec([{ sql: `PRAGMA table_info(${tableName})`, args: [] }], true, (error, result) => {
                 try {
+
                     if (error) {
                         console.error(error);
                         reject(error);
@@ -324,11 +424,12 @@ class Database<D extends string> implements IDatabase<D> {
                         reject(single<any>(result)?.error);
                         return;
                     }
+                    const table = this.tables.find(x => x.tableName === tableName);
                     const data = result as ResultSet[]
                     var keys = [] as string[];
                     for (var i = 0; i < data.length; i++) {
                         for (let r = 0; r < data[i].rows.length; r++) {
-                            if (data[i].rows[r].name != 'id')
+                            if ((table === undefined && data[i].rows[r].name != 'id') || (table && table.props.find(x => x.columnName == data[i].rows[r].name && !x.isAutoIncrement)))
                                 keys.push(data[i].rows[r].name);
                         }
                     }
@@ -342,30 +443,30 @@ class Database<D extends string> implements IDatabase<D> {
         }) as Promise<string[]>;
     };
 
-    public watch<T>(tableName: D) {
+    public watch<T extends IId<D>>(tableName: D) {
         var watcher = new Watcher<T, D>(tableName) as IWatcher<T, D>;
         watchers.push(watcher);
         return watcher;
     }
 
-    public async asQueryable<T>(item: (T & IBaseModule<D>), tableName?: D) {
+    public async asQueryable<T extends IId<D>>(item: (IId<D> | IBaseModule<D>), tableName?: D) {
         validateTableName(item, tableName);
         var db = this as IDatabase<D>
         return await createQueryResultType<T, D>(item as any, db);
 
     }
 
-    public query<T>(tableName: D) {
+    public query<T extends IId<D>>(tableName: D) {
         var db = this as IDatabase<D>
         return ((new Query<T, D>(tableName, db)) as IQuery<T, D>);
     }
 
-    public async save<T>(items: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
+    public async save<T extends IId<D>>(items: (T & T) | ((T & T)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
         const tItems = Array.isArray(items) ? items : [items];
         try {
             var returnItem = [] as T[];
             for (var item of tItems) {
-                returnItem.push(await this.localSave<T>(item, insertOnly, tableName, saveAndForget) ?? item as any);
+                returnItem.push(await this.localSave<T>(item as any, insertOnly, tableName, saveAndForget) ?? item as any);
             }
             return returnItem as T[];
         } catch (e) {
@@ -374,13 +475,13 @@ class Database<D extends string> implements IDatabase<D> {
         }
     }
 
-    async delete(items: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) {
+    async delete(items: IId<D> | (IId<D>[]), tableName?: D) {
         try {
             var tItems = (Array.isArray(items) ? items : [items]).reduce((v, c) => {
-                validateTableName(c, tableName);
-                if (v[c.tableName])
-                    v[c.tableName].push(c);
-                else v[c.tableName] = [c];
+                const x = validateTableName(c, tableName);
+                if (v[x.tableName])
+                    v[x.tableName].push(c);
+                else v[x.tableName] = [c];
 
                 return v;
             }, {} as any);
@@ -403,30 +504,9 @@ class Database<D extends string> implements IDatabase<D> {
         return ((await this.find(query.sql, query.args, tableName)) as any) as T[];
     }
 
-    async where<T>(tableName: D, query?: any | T) {
-        var q = `SELECT * FROM ${tableName} ${query ? 'WHERE ' : ''}`;
-        var values = [] as any[];
-        if (query && Object.keys(query).length > 0) {
-            var keys = Object.keys(query);
-            keys.forEach((x, i) => {
-                var start = x.startsWith('$') ? x.substring(0, x.indexOf('-')).replace('-', '') : undefined;
-                if (!start) {
-                    q += x + '=? ' + (i < keys.length - 1 ? 'AND ' : '');
-                    values.push(query[x]);
-                } else {
-                    if (start == '$in') {
-                        var v = query[x] as [];
-                        q += x.replace("$in-", "") + ' IN (';
-                        v.forEach((item, index) => {
-                            q += '?' + (index < v.length - 1 ? ', ' : '');
-                            values.push(item);
-                        });
-                    }
-                    q += ') ' + (i < keys.length - 1 ? 'AND ' : '');
-                }
-            });
-        }
-        return ((await this.find(q, values, tableName)) as any) as T[];
+    async where<T extends IId<D>>(tableName: D, query?: any | T) {
+        const q = translateSimpleSql(this, tableName, query);
+        return ((await this.find(q.sql, q.args, tableName)) as any) as T[];
     }
 
     async find(query: string, args?: any[], tableName?: string) {
@@ -536,7 +616,7 @@ class Database<D extends string> implements IDatabase<D> {
     };
 
     async bulkSave<T>(tableName: D) {
-        const item = new BulkSave<T, D>(this as IDatabase<D>, await this.allowedKeys(tableName), tableName);
+        const item = new BulkSave<T, D>(this as IDatabase<D>, await this.allowedKeys(tableName, true), tableName);
         return item;
     }
 

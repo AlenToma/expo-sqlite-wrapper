@@ -1,5 +1,5 @@
 import { IBaseModule, IDatabase, IDataBaseExtender } from "./expo.sql.wrapper.types";
-import { encrypt, isDate, oEncypt } from "./SqlQueryBuilder";
+import { encrypt, isDate, oEncypt, getAvailableKeys } from "./SqlQueryBuilder";
 import * as SQLite from 'expo-sqlite';
 
 export default class BulkSave<T, D extends string> {
@@ -19,16 +19,17 @@ export default class BulkSave<T, D extends string> {
         const table = this.dbContext.tables.find(x => x.tableName == this.tableName);
         itemArray.forEach(item => {
             const q = { sql: `INSERT INTO ${this.tableName} (`, args: [] };
-            this.keys.forEach((k, i) => {
-                q.sql += k + (i < this.keys.length - 1 ? ',' : '');
+            const keys = getAvailableKeys(this.keys, item);
+            keys.forEach((k, i) => {
+                q.sql += k + (i < keys.length - 1 ? ',' : '');
             });
             q.sql += ') values(';
-            this.keys.forEach((k, i) => {
-                q.sql += '?' + (i < this.keys.length - 1 ? ',' : '');
+            keys.forEach((k, i) => {
+                q.sql += '?' + (i < keys.length - 1 ? ',' : '');
             });
             q.sql += ')';
 
-            this.keys.forEach((k: string, i) => {
+            keys.forEach((k: string, i) => {
                 const column = table?.props.find(x => x.columnName == k && x.encryptionKey);
                 let v = (item as any)[k] ?? null;
                 if (isDate(v))
@@ -50,11 +51,12 @@ export default class BulkSave<T, D extends string> {
         const table = this.dbContext.tables.find(x => x.tableName == this.tableName);
         itemArray.forEach(item => {
             const q = { sql: `UPDATE ${this.tableName} SET `, args: [] };
-            this.keys.forEach((k, i) => {
-                q.sql += ` ${k}=? ` + (i < this.keys.length - 1 ? ',' : '');
+            const keys = getAvailableKeys(this.keys, item);
+            keys.forEach((k, i) => {
+                q.sql += ` ${k}=? ` + (i < keys.length - 1 ? ',' : '');
             });
             q.sql += ' WHERE id=?';
-            this.keys.forEach((k: string, i) => {
+            keys.forEach((k: string, i) => {
                 const column = table?.props.find(x => x.columnName == k && x.encryptionKey);
                 let v = (item as any)[k] ?? null;
                 if (isDate(v))
@@ -79,11 +81,14 @@ export default class BulkSave<T, D extends string> {
         });
         return this;
     }
-    
+
 
     async execute() {
-        if (this.quries.length > 0)
+        if (this.quries.length > 0) {
             await this.dbContext.executeRawSql(this.quries, false);
+            const db = this.dbContext as IDataBaseExtender<D>;
+            await db.triggerWatch([], "onBulkSave", undefined, this.tableName);
+        }
     }
 
 }

@@ -14,6 +14,7 @@ Installation for `expo-sqlite` read https://docs.expo.dev/versions/latest/sdk/sq
 * [Watch the db operations](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Watcher.md)
 * [BulkSave](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/BulkSave.md)
 * [Encryptions](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Encryptions.md)
+* [useQuery](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/useQuery.md)
 
 ### IQuery
 ```js
@@ -52,13 +53,39 @@ export interface IQuery<T, D extends string> {
 ### IDatabase
 ```ts
 export interface IDatabase<D extends string> {
-     /**
-     * BulkSave object
-     * this will not trigger watchers.
+    /**
+     * This is a hook you could use in a component
      */
-    bulkSave: <T>(tabelName: D) => Promise<BulkSave<T, D>>;
-    
-    isClosed?: boolean;
+    useQuery: IUseQuery;
+
+    /**
+     * Freeze all watchers, this is usefull when for example doing many changes to the db
+     * and you dont want the watchers to be triggerd many times
+     */
+    disableWatchers: () => IDatabase<D>;
+    /**
+     * Enabling Watchers will call all the frozen watchers that has not been called when it was frozen
+     */
+    enableWatchers: () => Promise<void>;
+
+    /**
+    * Freeze all hooks, this is usefull when for example doing many changes to the db
+    * and you dont want the hooks to be triggerd(rerender components) many times
+    */
+    disableHooks: () => IDatabase<D>;
+
+    /**
+    * Enabling Hooks will call all the frozen hooks that has not been called when it was frozen
+    */
+    enableHooks: () => Promise<void>;
+
+    /**
+     * BulkSave object
+     * This will only watchers.onBulkSave
+     */
+    bulkSave: <T extends IBaseModule<D>>(tabelName: D) => Promise<BulkSave<T, D>>;
+
+    isClosed?: boolean,
     /**
      * Its importend that,createDbContext return new database after this is triggered
      */
@@ -94,35 +121,35 @@ export interface IDatabase<D extends string> {
     /**
      * convert json to IQueryResultItem object, this will add method as savechanges, update and delete methods to an object
      */
-    asQueryable: <T>(item: T & IBaseModule<D>, tableName?: D) => Promise<IQueryResultItem<T, D>>;
-    watch: <T>(tableName: D) => IWatcher<T, D>;
+    asQueryable: <T extends IId<D>>(item: IId<D> | IBaseModule<D>, tableName?: D) => Promise<IQueryResultItem<T, D>>
+    watch: <T extends IId<D>>(tableName: D) => IWatcher<T, D>;
     /**
      * Create IQuery object.
      */
-    query: <T>(tableName: D) => IQuery<T, D>;
+    query: <T extends IId<D>>(tableName: D) => IQuery<T, D>;
     /**
      * execute sql eg
      * query: select * from users where name = ?
      * args: ["test"]
      */
-    find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>;
+    find: (query: string, args?: any[], tableName?: D) => Promise<IBaseModule<D>[]>
     /**
      * trigger save, update will depend on id and unique columns
      */
-    save: <T>(item: (T & IBaseModule<D>) | ((T & IBaseModule<D>)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) => Promise<T[]>;
-    where: <T>(tableName: D, query?: any | T) => Promise<T[]>;
+    save: <T extends IId<D>>(item: (T) | ((T)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) => Promise<T[]>;
+    where: <T extends IId<D>>(tableName: D, query?: any | T) => Promise<T[]>;
     /**
      * this method translate json-sql to sqlite select.
-     * for more info about this read json-sql documentations
+     * for more info about this read json-sql documentations 
      * https://github.com/2do2go/json-sql/tree/4be018c0662dacba06ddf033d18e71ebf93ee7c3/docs
-     * example
+     * example 
      * {
         type: 'select',
         table: 'DetaliItems',
-        condition:{"DetaliItems.id":{$gt: 1}, "DetaliItems.title": "Epic Of Caterpillar"},
+        condition:{"DetaliItems.id":{$gt: 1}, "DetaliItems.title": "Epic Of Caterpillar"},  
         join: {
         Chapters: {
-            on: {'DetaliItems.id': 'Chapters.detaliItem_Id'}
+            on: {'DetaliItems.id': 'Chapters.detaliItem_Id'} 
             }
         }
       }
@@ -131,7 +158,7 @@ export interface IDatabase<D extends string> {
     /**
      * delete object based on Id
      */
-    delete: (item: IBaseModule<D> | (IBaseModule<D>[]), tableName?: D) => Promise<void>;
+    delete: (item: IId<D> | (IId<D>[]), tableName?: D) => Promise<void>;
     /**
      * execute sql without returning anyting
      */
@@ -141,13 +168,13 @@ export interface IDatabase<D extends string> {
      */
     dropTables: () => Promise<void>;
     /**
-     * Setup your table, this will only create a table if it dose not exist
+     * Setup your table, this will only create a table if it dose not exist 
      */
     setUpDataBase: (forceCheck?: boolean) => Promise<void>;
     /**
      * find out if there some changes between object and db table
      */
-    tableHasChanges: <T>(item: ITableBuilder<T, D>) => Promise<boolean>;
+    tableHasChanges: <T extends IBaseModule<D>>(item: ITableBuilder<T, D>) => Promise<boolean>;
     /**
      * execute an array of sql
      */

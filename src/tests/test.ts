@@ -1,6 +1,6 @@
 import 'should'
 import mocha from 'mocha'
-import { createQueryResultType, Query, jsonToSqlite, encrypt, decrypt } from '../SqlQueryBuilder';
+import { createQueryResultType, Query, jsonToSqlite, encrypt, decrypt, getAvailableKeys, translateSimpleSql } from '../SqlQueryBuilder';
 import BulkSave from '../BulkSave';
 import TableBuilder from '../TableStructor'
 import crypto from 'crypto-js'
@@ -20,9 +20,32 @@ const database = {
 
 const item = {
     name: "test 1",
-    id: 1, 
+    id: 1,
     password: "test hahaha"
 } as Test
+
+mocha.describe("testWhere", function () {
+    console.log("testWhere")
+    const q = translateSimpleSql(database, "Test", { "$in-password": ["test", "hahaha"], name: "hey" })
+    const q2 = translateSimpleSql(database, "Test", { password: "test", name: "hey" })
+    const q3 = translateSimpleSql(database, "Test");
+    q.sql.should.eql("SELECT * FROM Test WHERE password IN (?, ?) AND name=? ");
+    q.args[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==");
+    q.args[2].should.eql("hey")
+    q2.sql.should.eql("SELECT * FROM Test WHERE password=? AND name=? ");
+    q2.args[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==");
+    q2.args[1].should.eql("hey");
+    q3.sql.should.eql("SELECT * FROM Test ");
+});
+
+
+mocha.describe("testgetAvailableKeys", function () {
+    const items = getAvailableKeys(["name", "id", "password"], {
+        password: "test"
+    })
+
+    items.length.should.eql(1);
+});
 
 mocha.describe("encryptions", function () {
     const en = encrypt("test", "123")
@@ -42,13 +65,13 @@ mocha.describe("readEncryption", function () {
 
 mocha.describe("JsonToSql", function () {
 
-   const sql = jsonToSqlite({
+    const sql = jsonToSqlite({
         type: 'select',
         table: 'DetaliItems',
-        condition:{"DetaliItems.id":{$gt: 1}, "DetaliItems.title": "Epic Of Caterpillar"},  
+        condition: { "DetaliItems.id": { $gt: 1 }, "DetaliItems.title": "Epic Of Caterpillar" },
         join: {
             Chapters: {
-                on: {'DetaliItems.id': 'Chapters.detaliItem_Id'} 
+                on: { 'DetaliItems.id': 'Chapters.detaliItem_Id' }
             }
         }
     })
@@ -90,7 +113,7 @@ mocha.describe("DeleteWithSearchNotIn", function () {
 
     var q = new Query<Test, TableName>("Test", database);
 
-    q.Start().Column("id").NotIn([10,2]).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
+    q.Start().Column("id").NotIn([10, 2]).End().getQueryResult("DELETE").sql.trim().should.eql("DELETE FROM Test  WHERE ( id NOT IN ( ?,? ) )")
 });
 
 
