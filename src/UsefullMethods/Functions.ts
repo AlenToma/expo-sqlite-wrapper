@@ -69,6 +69,8 @@ class Functions {
     }
 
     translateAndEncrypt(v: any, database: IDataBaseExtender<string>, tableName: string, column?: string) {
+        if (column && column.indexOf("."))
+            column = this.last(column.split("."))
         const table = database.tables.find(x => x.tableName == tableName);
         const encryptValue = typeof v === "string" && column && table && table.props.find(f => f.columnName === column && f.encryptionKey) != undefined;
         v = this.translateToSqliteValue(v);
@@ -130,7 +132,7 @@ class Functions {
     }
 
 
-    jsonToSqlite(query: any){
+    jsonToSqlite(query: any) {
         try {
             const builder = jsonsql();
             const sql = builder.build(query);
@@ -182,15 +184,15 @@ class Functions {
                 }
             });
         }
-    
+
         return { sql: q, args: values };
     }
 
-    getAvailableKeys (dbKeys: string[], item: any) {
+    getAvailableKeys(dbKeys: string[], item: any) {
         return dbKeys.filter(x => Object.keys(item).includes(x));
     }
 
-    createSqlInstaceOfType(prototype: any, item: any){
+    createSqlInstaceOfType(prototype: any, item: any) {
         if (!prototype)
             return item;
         const x = Object.create(prototype);
@@ -199,7 +201,7 @@ class Functions {
         return x;
     }
 
-    counterSplit <T>(titems: T[], counter: number): T[][] {
+    counterSplit<T>(titems: T[], counter: number): T[][] {
         var items = [] as T[][];
         titems.forEach((x, index) => {
             if (items.length <= 0 || index % counter === 0) {
@@ -208,7 +210,7 @@ class Functions {
             var current = this.last<T[]>(items) ?? [];
             current.push(x);
         })
-    
+
         return items;
     }
 
@@ -217,12 +219,12 @@ class Functions {
             return undefined;
         if (index < 0 || index >= titems.length)
             return undefined;
-    
+
         return this[index];
     }
 
     last<T>(titems: Array<T> | undefined): T | undefined {
-        return titems && titems.length >0 ? titems[titems.length - 1] : undefined;
+        return titems && titems.length > 0 ? titems[titems.length - 1] : undefined;
     }
 
     toType<T>(titems: Array<T> | undefined): Array<T> | T[] {

@@ -1,6 +1,6 @@
 import QuerySelector, { Param, Where, IColumnSelector } from './QuerySelector'
 import * as SqlLite from 'expo-sqlite'
-import {Counter, StringBuilder, Functions} from './UsefullMethods'
+import { Counter, StringBuilder, Functions } from './UsefullMethods'
 
 export default class QuerySelectorTranslator {
     selector: QuerySelector<any, string>;
@@ -101,12 +101,19 @@ export default class QuerySelectorTranslator {
     private translateWhere(item: Where<any, any, string>, args: any[]) {
         const counter = new Counter(item.Queries);
         let sql = new StringBuilder();
+        const findColumn = () => {
+            for (let i = counter.currentIndex; i >= 0; i--) {
+                const value = counter.index(i);
+                if (value && value.isColumn)
+                    return value.getColumn(this.selector.jsonExpression);
+            }
+
+            return undefined;
+        }
         while (counter.hasNext) {
             const value = counter.next;
-            const pValue = counter.prev;
-            let column = undefined;
-            if (pValue && (pValue.isColumn || pValue.isFunction))
-                column = pValue.getColumn(this.selector.jsonExpression)
+
+            let column = findColumn();;
             const arrValue = value.map(x => x);
             switch (value.args) {
                 case Param.EqualTo:
@@ -117,12 +124,18 @@ export default class QuerySelectorTranslator {
                 case Param.EqualAndGreaterThen:
                 case Param.EqualAndLessThen:
                     sql.append(value.args.substring(1));
-                    if (!value.isFunction && !value.isColumn) {
+                    if ((!value.isFunction && !value.isColumn) || value.isInnerSelect) {
                         {
-                            if (value.args.indexOf("(") != -1)
-                                sql.append(arrValue.map(x => "?").join(", "), ")");
-                            else sql.append("?");
-                            args.push(...arrValue.map(x => Functions.translateAndEncrypt(x.value, this.selector.database, item.tableName, column)));
+                            if (value.isInnerSelect) {
+                                if (value.args.indexOf("(") != -1)
+                                    sql.append(value.getInnerSelect(), ")");
+                                else sql.append(value.getInnerSelect());
+                            } else {
+                                if (value.args.indexOf("(") != -1)
+                                    sql.append(arrValue.map(x => "?").join(", "), ")");
+                                else sql.append("?");
+                                args.push(...arrValue.map(x => Functions.translateAndEncrypt(x.value, this.selector.database, item.tableName, column)));
+                            }
                         }
                     } else {
                         if (value.args.indexOf("(") != -1)
@@ -138,7 +151,16 @@ export default class QuerySelectorTranslator {
                 case Param.StartParameter:
                 case Param.EndParameter:
                 case Param.Not:
+                case Param.Between:
                     sql.append(value.args.substring(1));
+                    break;
+                case Param.Value:
+                    if (value.isFunction || value.isColumn){
+                        sql.append(value.getColumn(this.selector.jsonExpression));
+                    }else {
+                        sql.append("?")
+                        args.push(Functions.translateToSqliteValue(value.value));
+                    }
                     break;
                 case Param.Contains:
                 case Param.StartWith:
@@ -155,16 +177,39 @@ export default class QuerySelectorTranslator {
                     } else {
                         sql.append("like", v);
                     }
-
                     break;
                 default:
                     if (value.isFunction || value.isColumn)
                         sql.append(value.getColumn(this.selector.jsonExpression));
+
                     break
             }
         }
 
         return sql;
+    }
+
+    translateToInnerSelectSql() {
+        const sqlQuery = this.translate("SELECT");
+        const sql = new StringBuilder(sqlQuery.sql);
+        const tempQuestionMark = "#questionMark"
+        const c = "?";
+        while (sql.indexOf(c) !== -1 && sqlQuery.args.length > 0) {
+            {
+
+                let value = sqlQuery.args.shift();
+                if (Functions.isDefained(value) && typeof value === "string") {
+                    if (value.indexOf(c) !== -1)
+                        value = value.replace(new RegExp("\\" + c, "gmi"), tempQuestionMark)
+                    value = `'${value}'`;
+                }
+                if (!Functions.isDefained(value))
+                    value = "NULL";
+                sql.replaceIndexOf(c, value.toString())
+            }
+        }
+
+        return sql.toString().replace(new RegExp(tempQuestionMark, "gmi"), c);
     }
 
     translate(selectType: "SELECT" | "DELETE") {

@@ -40,6 +40,16 @@ export default class StringBuilder {
         return this;
     }
 
+    indexOf(search: string) {
+        return this.text.indexOf(search);
+    }
+
+    replaceIndexOf(text: string, replacement: string) {
+        const index = this.text.indexOf(text);
+        this.text = this.text.substring(0, index) + replacement + this.text.substring(index + text.length);
+        return this;
+    }
+
     toString() {
         return this.text;
     }

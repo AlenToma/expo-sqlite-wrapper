@@ -5,7 +5,10 @@ import { Errors, createQueryResultType, Functions, QValue } from './UsefullMetho
 
 export type IColumnSelector<T> = (x: T) => any;
 export type ArrayIColumnSelector<T> = (x: T) => any[];
-export type ArrayAndAliasIColumnSelector<T> = (x: T, as:<B>(column: B, alias: string)=> B) => any[];
+export type ArrayAndAliasIColumnSelector<T> = (x: T, as: <B>(column: B, alias: string) => B) => any[];
+export type InnerSelect = {
+    getInnerSelectSql: () => string;
+}
 export type R<T, S extends string> = Record<S, T>;
 
 
@@ -37,6 +40,8 @@ export enum Param {
     Max = "#Max",
     Min = "#Min",
     Count = "#Count",
+    Between = "#BETWEEN",
+    Value= "#Value"
 }
 
 export declare type SingleValue =
@@ -61,7 +66,9 @@ export interface IReturnMethods<T, D extends string> {
     /**
      * get the translated sql
      */
-    getSql: (sqlType: "DELETE" | "SELECT") => SqlLite.Query
+    getSql: (sqlType: "DELETE" | "SELECT") => SqlLite.Query;
+
+    getInnerSelectSql: () => string;
 }
 
 
@@ -86,13 +93,17 @@ export interface IOrderBy<T, ReturnType> {
 
 export interface GenericQuery<T, ParentType, D extends string, ReturnType> extends IReturnMethods<ParentType, D>, IOrderBy<T, ReturnType> {
     /**
- * Select based on Column
- */
+    * Select based on Column
+    */
     Column: (column: IColumnSelector<T>) => ReturnType;
+    /**
+     * Add BETWEEN
+     */
+    Between(value1: SingleValue | IColumnSelector<T>, value2: SingleValue | IColumnSelector<T>): ReturnType;
     /**
      * EqualTo based on value or column from a table
      */
-    EqualTo: (value: SingleValue | IColumnSelector<T>) => ReturnType;
+    EqualTo: (value: SingleValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * Contains based on value or column from a table
      */
@@ -108,15 +119,15 @@ export interface GenericQuery<T, ParentType, D extends string, ReturnType> exten
     /**
      * NotEqualTo based on value or column from a table
      */
-    NotEqualTo: (value: SingleValue | IColumnSelector<T>) => ReturnType;
+    NotEqualTo: (value: SingleValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * EqualAndGreaterThen based on value or column from a table
      */
-    EqualAndGreaterThen: (value: NumberValue | StringValue | IColumnSelector<T>) => ReturnType;
+    EqualAndGreaterThen: (value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * EqualAndLessThen based on value or column from a table
      */
-    EqualAndLessThen: (value: NumberValue | StringValue | IColumnSelector<T>) => ReturnType;
+    EqualAndLessThen: (value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * Add (
      */
@@ -136,15 +147,15 @@ export interface GenericQuery<T, ParentType, D extends string, ReturnType> exten
     /**
      * GreaterThan based on value or column from a table
      */
-    GreaterThan: (value: NumberValue | StringValue | IColumnSelector<T>) => ReturnType;
+    GreaterThan: (value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * LessThan based on value or column from a table
      */
-    LessThan: (value: NumberValue | StringValue | IColumnSelector<T>) => ReturnType;
+    LessThan: (value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * IN based on array Value or column from a table
      */
-    IN: (value: ArrayValue | IColumnSelector<T>) => ReturnType;
+    IN: (value: ArrayValue | IColumnSelector<T> | InnerSelect) => ReturnType;
     /**
      * Add NOT
      */
@@ -228,7 +239,7 @@ export interface IQuerySelector<T, D extends string> extends IReturnMethods<T, D
     Select: IQueryColumnSelector<T, T, D>;
 };
 
-export type IQueryColumnSelector<T, ParentType, D extends string> = {
+export interface IQueryColumnSelector<T, ParentType, D extends string> extends IReturnMethods<ParentType, D> {
     /**
      * Default is select * from
      * you can specify the columns here
@@ -276,11 +287,19 @@ class ReturnMethods<T, ParentType extends IId<D>, D extends string>{
     }
 
     /**
-    * get the translated sql
+    * get the translated sqlQuery
     */
     getSql(sqlType: "DELETE" | "SELECT") {
         return this.parent.getSql(sqlType);
-    };
+    }
+
+    /**
+     * get a simple sql
+     * @returns sql string
+     */
+    getInnerSelectSql() {
+        return this.parent.getInnerSelectSql();
+    }
 }
 
 
@@ -344,6 +363,18 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
         this.alias = alias;
     }
 
+    Between(value1: SingleValue | IColumnSelector<T>, value2: SingleValue | IColumnSelector<T>) {
+        this.parent.clear();
+        if (this.Queries.length > 0)
+            {
+                this.Queries.push(QValue.Q.Args(Param.Between))
+                this.Queries.push(QValue.Q.Args(Param.Value).Value(value1));
+                this.AND;
+                this.Queries.push(QValue.Q.Args(Param.Value).Value(value2));
+            }
+        return this;
+    }
+
     Cast<B>(converter: (x: ParentType | unknown) => B) {
         this.parent.converter = converter;
         return this as IReturnMethods<ParentType, D>;
@@ -360,21 +391,21 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
         return this;
     }
 
-    EqualTo(value: SingleValue | IColumnSelector<T>) {
+    EqualTo(value: SingleValue | IColumnSelector<T> | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0)
             this.Queries.push(QValue.Q.Value(value).Args(Param.EqualTo))
         return this;
     }
 
-    NotEqualTo(value: SingleValue | IColumnSelector<T>) {
+    NotEqualTo(value: SingleValue | IColumnSelector<T> | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0)
             this.Queries.push(QValue.Q.Value(value).Args(Param.NotEqualTo))
         return this;
     }
 
-    EqualAndGreaterThen(value: NumberValue | StringValue) {
+    EqualAndGreaterThen(value: NumberValue | StringValue | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0)
             this.Queries.push(QValue.Q.Value(value).Args(Param.EqualAndGreaterThen))
@@ -382,7 +413,7 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
         return this;
     }
 
-    EqualAndLessThen(value: NumberValue | StringValue | IColumnSelector<T>) {
+    EqualAndLessThen(value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0)
             this.Queries.push(QValue.Q.Value(value).Args(Param.EqualAndLessThen))
@@ -414,21 +445,21 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
         return this;
     }
 
-    GreaterThan(value: NumberValue | StringValue | IColumnSelector<T>) {
+    GreaterThan(value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0)
             this.Queries.push(QValue.Q.Value(value).Args(Param.GreaterThan))
         return this;
     }
 
-    LessThan(value: NumberValue | StringValue | IColumnSelector<T>) {
+    LessThan(value: NumberValue | StringValue | IColumnSelector<T> | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0)
             this.Queries.push(QValue.Q.Value(value).Args(Param.LessThan))
         return this;
     }
 
-    IN(value: ArrayValue | IColumnSelector<T>) {
+    IN(value: ArrayValue | IColumnSelector<T> | InnerSelect) {
         this.parent.clear();
         if (this.Queries.length > 0) this.Queries.push(QValue.Q.Value(value).Args(Param.IN))
         return this;
@@ -691,6 +722,10 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
 
     getSql(sqlType: "SELECT" | "DELETE") {
         return ((this.translator = (this.translator ? this.translator : new QuerySelectorTranslator(this))).translate(sqlType));
+    }
+
+    getInnerSelectSql() {
+        return ((this.translator = (this.translator ? this.translator : new QuerySelectorTranslator(this))).translateToInnerSelectSql());
     }
 
     OrderByAsc(columnName: IColumnSelector<T> | ArrayIColumnSelector<T>) {

@@ -8,9 +8,11 @@ export default class QValue {
     alias?: string;
     isFunction: boolean;
     selector?: QuerySelector<any, any>;
+    isInnerSelect?: boolean;
     type = "QValue";
 
     validate() {
+        this.isInnerSelect = this.value && this.value.getInnerSelectSql !== undefined;
         this.isFunction = Functions.isFunc(this.value);
     }
 
@@ -99,5 +101,10 @@ export default class QValue {
     Alias(alias: string) {
         this.alias = alias;
         return this;
+    }
+
+    getInnerSelect(){
+        let sql = this.value.getInnerSelectSql();
+        return `(${sql})`;
     }
 }

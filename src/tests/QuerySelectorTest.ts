@@ -1,6 +1,6 @@
 import 'should'
 import mocha from 'mocha'
-import {createQueryResultType, Functions} from '../UsefullMethods'
+import { createQueryResultType, Functions } from '../UsefullMethods'
 import BulkSave from '../BulkSave';
 import TableBuilder from '../TableStructor'
 import QuerySelector, { IQuerySelector } from '../QuerySelector';
@@ -70,7 +70,7 @@ mocha.describe("encryptions", function () {
 mocha.describe("readEncryption", function () {
     console.log("readEncryption")
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as IQuerySelector<TestA, TableNames>;
-    const sql = q.Where.Column(x=> x.password).EqualTo("test").AND.Column(x=> x.name).EqualTo("hey").Limit(100).OrderByAsc(x=> x.name).getSql("SELECT")
+    const sql = q.Where.Column(x => x.password).EqualTo("test").AND.Column(x => x.name).EqualTo("hey").Limit(100).OrderByAsc(x => x.name).getSql("SELECT")
     sql.sql.trim().should.eql("SELECT * FROM TestA WHERE password = ? AND name = ? ORDER BY name ASC Limit 100")
     sql.args[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==")
     sql.args[1].should.eql("hey")
@@ -80,12 +80,12 @@ mocha.describe("readEncryption", function () {
 mocha.describe("startWith", function () {
     console.log("startWith")
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as IQuerySelector<TestA, TableNames>;
-    const sql = q.Where.Column(x=> x.password).EqualTo("test").AND.Column(x=> x.name)
-    .EqualTo("hey").AND
-    .Column(x=> x.name)
-    .Not.StartsWith(x=> x.password)
-    .Start.Column(x=> x.name).EndsWith("he").End
-    .Limit(100).OrderByAsc(x=> x.name).getSql("SELECT")  
+    const sql = q.Where.Column(x => x.password).EqualTo("test").AND.Column(x => x.name)
+        .EqualTo("hey").AND
+        .Column(x => x.name)
+        .Not.StartsWith(x => x.password)
+        .Start.Column(x => x.name).EndsWith("he").End
+        .Limit(100).OrderByAsc(x => x.name).getSql("SELECT")
     sql.sql.trim().should.eql("SELECT * FROM TestA WHERE password = ? AND name = ? AND name NOT like password + \'%\' ( name like ? ) ORDER BY name ASC Limit 100")
     sql.args[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==")
     sql.args[1].should.eql("hey")
@@ -128,7 +128,7 @@ mocha.describe("bulkSaveWithEncryptionsUpdate", function () {
 mocha.describe("DeleteWthLimit", function () {
     console.log("DeleteWthLimit");
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
-    const sql = q.Limit(100).OrderByAsc(x=> x.name).getSql("DELETE")
+    const sql = q.Limit(100).OrderByAsc(x => x.name).getSql("DELETE")
     sql.sql.trim().should.eql("DELETE FROM TestA")
     sql.args.length.should.eql(0)
 });
@@ -173,7 +173,7 @@ mocha.describe("OrderDesc", function () {
 mocha.describe("OrderAsc", function () {
     console.log("OrderAsc");
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
-    const sql =  q.OrderByAsc(x => x.id).getSql("SELECT")
+    const sql = q.OrderByAsc(x => x.id).getSql("SELECT")
     sql.sql.trim().should.eql("SELECT * FROM TestA ORDER BY id ASC")
     sql.args.length.should.eql(0)
 });
@@ -201,7 +201,7 @@ mocha.describe("lessString", function () {
 mocha.describe("innerjoin", function () {
     console.log("innerjoin");
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
-    const sql = q.InnerJoin<TestB, "b">("TestB","b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x => x.a.id).LessThan(15).getSql("SELECT");
+    const sql = q.InnerJoin<TestB, "b">("TestB", "b").Column(x => x.a.id).EqualTo(x => x.b.parentId).Where.Column(x => x.a.id).LessThan(15).getSql("SELECT");
     sql.sql.trim().should.eql("SELECT * FROM TestA as a INNER JOIN TestB as b ON  a.id = b.parentId WHERE a.id < ?")
     sql.args[0].should.eql(15)
     sql.args.length.should.eql(1)
@@ -210,7 +210,7 @@ mocha.describe("innerjoin", function () {
 mocha.describe("leftjoin", function () {
     console.log("leftjoin");
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
-    const sql = q.LeftJoin<TestB, "b">("TestB","b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x => x.a.id).LessThan(15).getSql("SELECT");
+    const sql = q.LeftJoin<TestB, "b">("TestB", "b").Column(x => x.a.id).EqualTo(x => x.b.parentId).Where.Column(x => x.a.id).LessThan(15).getSql("SELECT");
     sql.sql.trim().should.eql("SELECT * FROM TestA as a LEFT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < ?")
     sql.args[0].should.eql(15)
     sql.args.length.should.eql(1)
@@ -219,7 +219,7 @@ mocha.describe("leftjoin", function () {
 mocha.describe("RIGHTjOIN", function () {
     console.log("RIGHTjOIN");
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
-    const sql = q.RightJoin<TestB, "b">("TestB","b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x => x.a.id).LessThan(15).getSql("SELECT");
+    const sql = q.RightJoin<TestB, "b">("TestB", "b").Column(x => x.a.id).EqualTo(x => x.b.parentId).Where.Column(x => x.a.id).LessThan(15).getSql("SELECT");
     sql.sql.trim().should.eql("SELECT * FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < ?")
     sql.args[0].should.eql(15)
     sql.args.length.should.eql(1)
@@ -228,20 +228,77 @@ mocha.describe("RIGHTjOIN", function () {
 mocha.describe("HAVING", function () {
     console.log("HAVING");
     var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
-    const sql = q.RightJoin<TestB, "b">("TestB","b")
-    .Column(x=> x.a.id)
-    .EqualTo(x=> x.b.parentId)
-    .Where
-    .Column(x => x.a.id)
-    .LessThan(15)
-    .Select.Columns((x,as)=> [as(x.a.name, "setoNaming")])
-    .Count(x=> x.b.name, "sName")
-    .Having
-    .GroupBy(x=> x.a.id).Column("sName")
-    .GreaterThan(4).OrderByAsc(x=> x.a.name).OrderByDesc(x=> [x.a.id, x.b.fullName])
-    .getSql("SELECT");
+    const sql = q.RightJoin<TestB, "b">("TestB", "b")
+        .Column(x => x.a.id)
+        .EqualTo(x => x.b.parentId)
+        .Where
+        .Column(x => x.a.id)
+        .LessThan(15)
+        .Select.Columns((x, as) => [as(x.a.name, "setoNaming")])
+        .Count(x => x.b.name, "sName")
+        .Having
+        .GroupBy(x => x.a.id).Column("sName")
+        .GreaterThan(4).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
+        .getSql("SELECT");
     sql.sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < ? GROUP BY a.id HAVING sName > ? ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
     sql.args[0].should.eql(15)
     sql.args[1].should.eql(4)
     sql.args.length.should.eql(2)
+});
+
+mocha.describe("SimpleSql", function () {
+    console.log("SimpleSql");
+    var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    const sql = q.RightJoin<TestB, "b">("TestB", "b")
+        .Column(x => x.a.id)
+        .EqualTo(x => x.b.parentId)
+        .Where
+        .Column(x => x.a.id)
+        .LessThan(15).AND.Column(x => x.a.name).Not.StartsWith("?")
+        .Select.Columns((x, as) => [as(x.a.name, "setoNaming")])
+        .Count(x => x.b.name, "sName")
+        .Having
+        .GroupBy(x => x.a.id).Column("sName")
+        .GreaterThan(4).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
+        .getInnerSelectSql()
+    sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' GROUP BY a.id HAVING sName > 4 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+
+});
+
+mocha.describe("InnerSelect", function () {
+    console.log("InnerSelect");
+    var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    var q2 = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    const sql = q.RightJoin<TestB, "b">("TestB", "b")
+        .Column(x => x.a.id)
+        .EqualTo(x => x.b.parentId)
+        .Where
+        .Column(x => x.a.id)
+        .LessThan(15).AND.Column(x => x.a.name).Not.StartsWith("?").AND.Column(x => x.a.password).Not.IN(q2.Where.Column(x => x.id).GreaterThan(1).Select.Columns(x => [x.password]))
+        .Select.Columns((x, as) => [as(x.a.name, "setoNaming")])
+        .Count(x => x.b.name, "sName")
+        .Having
+        .GroupBy(x => x.a.id).Column("sName")
+        .GreaterThan(4).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
+        .getInnerSelectSql()
+    sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+});
+
+mocha.describe("ValueAndBetWeen", function () {
+    console.log("ValueAndBetWeen");
+    var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    var q2 = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    const sql = q.RightJoin<TestB, "b">("TestB", "b")
+        .Column(x => x.a.id)
+        .EqualTo(x => x.b.parentId)
+        .Where
+        .Column(x => x.a.id)
+        .LessThan(15).AND.Column(x => x.a.name).Not.StartsWith("?").AND.Column(x => x.a.password).Not.IN(q2.Where.Column(x => x.id).GreaterThan(1).Select.Columns(x => [x.password]))
+        .Select.Columns((x, as) => [as(x.a.name, "setoNaming")])
+        .Count(x => x.b.name, "sName")
+        .Having
+        .GroupBy(x => x.a.id).Column("sName")
+        .GreaterThan(4).AND.Column(x=> x.a.id).Between(2,5).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
+        .getInnerSelectSql()
+    sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
 });
