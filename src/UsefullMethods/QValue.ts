@@ -3,6 +3,7 @@ import {IDataBaseExtender} from '../expo.sql.wrapper.types'
 import QuerySelector,{Param} from '../QuerySelector'
 export default class QValue {
     value?: any;
+    value2?: any;
     args?: Param;
     isColumn?: boolean;
     alias?: string;
@@ -39,15 +40,15 @@ export default class QValue {
 
     }
 
-    map(fn: (x: QValue) => any) {
+    map<B>(fn: (x: QValue) => B) {
         return this.toArray().map(x => {
             const item = QValue.Q;
             item.isColumn = this.isColumn;
             item.args = this.args;
             item.isFunction = this.isFunction;
-            item.value = x;
+            item.Value(x);
             return fn(item);
-        }) as QValue[];
+        }) as B[];
     }
 
     toArray() {
@@ -63,7 +64,7 @@ export default class QValue {
             if (typeof this.value === "string")
                 return this.value as string;
             else {
-                return this.toType<Function>()(jsonExpression, Functions.aliasNameming).toString().split(",").filter(x => x.length > 1).join(",") as string;
+                return this.toType<Function>()(jsonExpression, Functions.aliasNameming).toString().split(",").filter(x => x.length > 0).join(",") as string;
             }
         } catch (e) {
             console.error(e, this)
@@ -86,6 +87,11 @@ export default class QValue {
     Value(value?: any) {
         this.value = value;
         this.validate();
+        return this;
+    }
+
+    Value2(value?: any) {
+        this.value2 = value;
         return this;
     }
     Args(args: Param) {

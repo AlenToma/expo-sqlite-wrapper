@@ -23,17 +23,35 @@ export default class QuerySelectorTranslator {
             return sql.append("SELECT * FROM", this.selector.tableName, this.selector.joins.length > 0 ? "as a" : "")
         const counter = new Counter(this.selector.queryColumnSelector.columns);
         let addedColumns = false;
+
+
         while (counter.hasNext) {
             const value = counter.next;
             switch (value.args) {
                 case Param.Count:
-                    sql.append(`COUNT(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    sql.append(`count(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
                     break;
                 case Param.Min:
-                    sql.append(`MIN(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    sql.append(`min(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
                     break;
                 case Param.Max:
-                    sql.append(`Max(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    sql.append(`max(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    break;
+                case Param.Sum:
+                    sql.append(`sum(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    break;
+                case Param.Avg:
+                    sql.append(`avg(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    break;
+                case Param.Total:
+                    sql.append(`total(${value.getColumn(this.selector.jsonExpression)})`, "as", value.alias, ",");
+                    break;
+                case Param.GroupConcat:
+                    sql.append(`group_concat(${value.getColumn(this.selector.jsonExpression)}${value.value2 ? `,'${value.value2}'` : ""})`, "as", value.alias, ",");
+                    break;
+                case Param.Concat:
+                    const arr = value.map<string>(x => x.isFunction ? x.getColumn(this.selector.jsonExpression) : `'${(x.value?.toString() ?? "")}'`).filter(x => x.length > 0).join(` ${value.value2 ?? "||"} `)
+                    sql.append(arr, "as", value.alias, ",");
                     break;
                 default:
                     addedColumns = true;
@@ -155,12 +173,16 @@ export default class QuerySelectorTranslator {
                     sql.append(value.args.substring(1));
                     break;
                 case Param.Value:
-                    if (value.isFunction || value.isColumn){
+                    if (value.isFunction || value.isColumn) {
                         sql.append(value.getColumn(this.selector.jsonExpression));
-                    }else {
+                    } else {
                         sql.append("?")
                         args.push(Functions.translateToSqliteValue(value.value));
                     }
+                    break;
+                case Param.Concat:
+                    const arr = value.map<string>(x => x.isFunction ? x.getColumn(this.selector.jsonExpression) : `'${(x.value?.toString() ?? "")}'`).filter(x => x.length > 0).join(` ${value.value2 ?? "||"} `)
+                    sql.append(arr);
                     break;
                 case Param.Contains:
                 case Param.StartWith:

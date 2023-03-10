@@ -240,7 +240,7 @@ mocha.describe("HAVING", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
         .getSql("SELECT");
-    sql.sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < ? GROUP BY a.id HAVING sName > ? ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+    sql.sql.trim().should.eql("SELECT a.name as setoNaming , count(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < ? GROUP BY a.id HAVING sName > ? ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
     sql.args[0].should.eql(15)
     sql.args[1].should.eql(4)
     sql.args.length.should.eql(2)
@@ -261,7 +261,7 @@ mocha.describe("SimpleSql", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' GROUP BY a.id HAVING sName > 4 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+    sql.trim().should.eql("SELECT a.name as setoNaming , count(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' GROUP BY a.id HAVING sName > 4 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
 
 });
 
@@ -281,7 +281,7 @@ mocha.describe("InnerSelect", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+    sql.trim().should.eql("SELECT a.name as setoNaming , count(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
 });
 
 mocha.describe("ValueAndBetWeen", function () {
@@ -298,7 +298,27 @@ mocha.describe("ValueAndBetWeen", function () {
         .Count(x => x.b.name, "sName")
         .Having
         .GroupBy(x => x.a.id).Column("sName")
-        .GreaterThan(4).AND.Column(x=> x.a.id).Between(2,5).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
+        .GreaterThan(4).AND.Column(x => x.a.id).Between(2, 5).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.name as setoNaming , COUNT(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+    sql.trim().should.eql("SELECT a.name as setoNaming , count(b.name) as sName FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
+});
+
+
+mocha.describe("Aggrigators", function () {
+    console.log("Aggrigators");
+    var q = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    var q2 = new QuerySelector<TestA, TableNames>("TestA", database) as any as IQuerySelector<TestA, TableNames>;
+    const sql = q.RightJoin<TestB, "b">("TestB", "b")
+        .Column(x => x.a.id)
+        .EqualTo(x => x.b.parentId)
+        .Where
+        .Column(x => x.a.id)
+        .LessThan(15).AND.Start.Concat("||", x => x.a.name, "-", x => x.a.id).End.EndsWith("1").AND.Column(x => x.a.name).Not.StartsWith("?").AND.Column(x => x.a.password).Not.IN(q2.Where.Column(x => x.id).GreaterThan(1).Select.Columns(x => [x.password]))
+        .Select.Columns((x, as) => [as(x.a.name, "setoNaming")])
+        .Count(x => "*", "sName").Sum(x => x.a.id, "s").Concat("NameAndId", "||", x => x.a.name, "-", x => x.a.id)
+        .Having
+        .GroupBy(x => x.a.id).Column("sName")
+        .GreaterThan(4).AND.Column(x => x.a.id).Between(2, 5).OrderByAsc(x => x.a.name).OrderByDesc(x => [x.a.id, x.b.fullName])
+        .getInnerSelectSql()
+    sql.trim().should.eql("SELECT a.name as setoNaming , count(*) as sName , sum(a.id) as s , a.name || \'-\' || a.id as NameAndId FROM TestA as a RIGHT JOIN TestB as b ON  a.id = b.parentId WHERE a.id < 15 AND ( a.name || \'-\' || a.id ) like \'%1\' AND a.name NOT like \'?%\' AND a.password NOT IN( (SELECT password FROM TestA WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.name ASC, a.id DESC, b.fullName DESC")
 });

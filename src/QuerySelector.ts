@@ -11,6 +11,7 @@ export type InnerSelect = {
 }
 export type R<T, S extends string> = Record<S, T>;
 
+export type ConcatSeperatorChar = "||" | "+" | "-";
 
 export enum Param {
     StartParameter = '#(',
@@ -37,11 +38,16 @@ export enum Param {
     InnerJoin = '#INNER JOIN',
     LeftJoin = '#LEFT JOIN',
     RightJoin = '#RIGHT JOIN',
-    Max = "#Max",
-    Min = "#Min",
-    Count = "#Count",
+    Max = "#MAX",
+    Min = "#MIN",
+    Count = "#COUNT",
+    Sum = "#SUM",
+    Total = "#Total",
+    GroupConcat = "#GroupConcat",
+    Avg = "#AVG",
     Between = "#BETWEEN",
-    Value= "#Value"
+    Value = "#Value",
+    Concat = "#Concat"
 }
 
 export declare type SingleValue =
@@ -96,6 +102,10 @@ export interface GenericQuery<T, ParentType, D extends string, ReturnType> exten
     * Select based on Column
     */
     Column: (column: IColumnSelector<T>) => ReturnType;
+    /**
+     * Bring togather columns and values, seperated by ConcatSeperatorChar
+     */
+    Concat: (collectCharacters_type: ConcatSeperatorChar, ...columnOrValues: (IColumnSelector<T> | string)[]) => ReturnType;
     /**
      * Add BETWEEN
      */
@@ -258,6 +268,27 @@ export interface IQueryColumnSelector<T, ParentType, D extends string> extends I
     */
     Count: (columns: IColumnSelector<T>, alias: string) => IQueryColumnSelector<T, ParentType, D>;
     /**
+    * sqlite aggrigator from Sum
+    */
+    Sum: (columns: IColumnSelector<T>, alias: string) => IQueryColumnSelector<T, ParentType, D>;
+    /**
+    * sqlite aggrigator from Total
+    */
+    Total: (columns: IColumnSelector<T>, alias: string) => IQueryColumnSelector<T, ParentType, D>;
+    /**
+    * sqlite concat columns and values eg lastname || ' ' || firstName as FullName;
+    */
+    Concat: (alias: string, collectCharacters_type: ConcatSeperatorChar, ...columnOrValues: (IColumnSelector<T> | string)[]) => IQueryColumnSelector<T, ParentType, D>;
+    /**
+    * sqlite aggrigator from group_concat
+    */
+    GroupConcat: (columns: IColumnSelector<T>, alias: string, seperator?: string) => IQueryColumnSelector<T, ParentType, D>;
+    /**
+    * sqlite aggrigator from Avg
+    */
+    Avg: (columns: IColumnSelector<T>, alias: string) => IQueryColumnSelector<T, ParentType, D>;
+
+    /**
     * incase you join data, then you will need to cast or convert the result to other type
     */
     Cast: <B>(converter?: (x: T | unknown) => B) => IReturnMethods<B, D>;
@@ -321,6 +352,12 @@ class QueryColumnSelector<T, ParentType extends IId<D>, D extends string> extend
         return this;
     }
 
+    Concat(alias: string, collectCharacters_type: ConcatSeperatorChar, ...columnOrValues: (IColumnSelector<T> | string)[]) {
+        this.parent.clear();
+        this.columns.push(QValue.Q.Value(columnOrValues).Args(Param.Concat).Value2(collectCharacters_type).Alias(alias));
+        return this;
+    }
+
     Max(columns: IColumnSelector<T>, alias: string) {
         this.parent.clear();
         this.columns.push(QValue.Q.Value(columns).Args(Param.Max).Alias(alias));
@@ -336,6 +373,31 @@ class QueryColumnSelector<T, ParentType extends IId<D>, D extends string> extend
     Count(columns: IColumnSelector<T>, alias: string) {
         this.parent.clear();
         this.columns.push(QValue.Q.Value(columns).Args(Param.Count).Alias(alias));
+        return this;
+    }
+
+    Sum(columns: IColumnSelector<T>, alias: string) {
+        this.parent.clear();
+        this.columns.push(QValue.Q.Value(columns).Args(Param.Sum).Alias(alias));
+        return this;
+    }
+
+    Total(columns: IColumnSelector<T>, alias: string) {
+        this.parent.clear();
+        this.columns.push(QValue.Q.Value(columns).Args(Param.Total).Alias(alias));
+        return this;
+    }
+
+
+    GroupConcat(columns: IColumnSelector<T>, alias: string, seperator?: string) {
+        this.parent.clear();
+        this.columns.push(QValue.Q.Value(columns).Args(Param.GroupConcat).Alias(alias).Value2(seperator));
+        return this;
+    }
+
+    Avg(columns: IColumnSelector<T>, alias: string) {
+        this.parent.clear();
+        this.columns.push(QValue.Q.Value(columns).Args(Param.Avg).Alias(alias));
         return this;
     }
 
@@ -365,13 +427,12 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
 
     Between(value1: SingleValue | IColumnSelector<T>, value2: SingleValue | IColumnSelector<T>) {
         this.parent.clear();
-        if (this.Queries.length > 0)
-            {
-                this.Queries.push(QValue.Q.Args(Param.Between))
-                this.Queries.push(QValue.Q.Args(Param.Value).Value(value1));
-                this.AND;
-                this.Queries.push(QValue.Q.Args(Param.Value).Value(value2));
-            }
+        if (this.Queries.length > 0) {
+            this.Queries.push(QValue.Q.Args(Param.Between))
+            this.Queries.push(QValue.Q.Args(Param.Value).Value(value1));
+            this.AND;
+            this.Queries.push(QValue.Q.Args(Param.Value).Value(value2));
+        }
         return this;
     }
 
@@ -388,6 +449,12 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
     Column(column: IColumnSelector<T> | string) {
         this.parent.clear();
         this.Queries.push(QValue.Q.Value(column).IsColumn(true));
+        return this;
+    }
+
+    Concat(collectCharacters_type: ConcatSeperatorChar, ...columnOrValues: (IColumnSelector<T> | string)[]) {
+        this.parent.clear();
+        this.Queries.push(QValue.Q.Value(columnOrValues).Args(Param.Concat).Value2(collectCharacters_type));
         return this;
     }
 
