@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc",
     "test": "mocha dist/tests/test.js",
-    "dev": "npm run build & npm run test"
+    "testNew": "mocha dist/tests/QuerySelectorTest.js",
+    "dev": "npm run build & npm run test",
+    "devNew": "npm run build & npm run testNew"
   },
   "keywords": [
     "sql",
@@ -43,6 +45,6 @@
     "@types/react": "*",
     "mocha": "*",
     "should": "*",
-    "typescript": "*"
+    "typescript": "^4.9.5"
   }
 }

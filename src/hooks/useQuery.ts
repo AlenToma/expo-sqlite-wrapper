@@ -1,5 +1,5 @@
 import { IBaseModule, IDatabase, IDataBaseExtender, IId, IQuery, IQueryResultItem } from "../expo.sql.wrapper.types";
-import { encrypt, isDate, oEncypt, getAvailableKeys, createQueryResultType, isFunc } from "../SqlQueryBuilder";
+import {createQueryResultType, Functions} from '../UsefullMethods'
 import * as SQLite from 'expo-sqlite';
 import { useState, useEffect, useRef } from 'react'
 
@@ -30,7 +30,7 @@ const UseQuery = <T extends IId<D>, D extends string>(
                 const fn = query as () => Promise<T[]>;
                 if (iQuery.Column !== undefined) {
                     dataRef.current = await iQuery.toList();
-                } else if (!isFunc(query)) {
+                } else if (!Functions.isFunc(query)) {
                     const r = [] as IQueryResultItem<T, D>[];
                     for (const x of (await dbContext.find(sQuery.sql, sQuery.args, tableName))) {
                         r.push(await createQueryResultType<T, D>(x, dbContext));

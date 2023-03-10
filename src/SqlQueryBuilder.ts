@@ -1,208 +1,6 @@
 import { IDataBaseExtender, NonFunctionPropertyNames, IBaseModule, SingleValue, ArrayValue, NumberValue, IChildQueryLoader, IChildLoader, IQuaryResult, IQuery, IQueryResultItem, IDatabase, Param, StringValue, IId } from './expo.sql.wrapper.types'
-import { TableBuilder } from './TableStructor';
-import crypto from 'crypto-js'
-import jsonsql from 'json-sql'
-
-export const CreateSqlInstaceOfType = (prototype: any, item: any) => {
-    if (!prototype)
-        return item;
-    const x = Object.create(prototype);
-    for (const key in item)
-        x[key] = item[key]
-    return x;
-}
-
-export const getAvailableKeys = (dbKeys: string[], item: any) => {
-    return dbKeys.filter(x => Object.keys(item).includes(x));
-}
-
-export const createQueryResultType = async function <T extends IId<D>, D extends string>(item: any, database: IDatabase<D>, children?: IChildLoader<D>[]): Promise<IQueryResultItem<T, D>> {
-    var result = (item as any) as IQueryResultItem<T, D>;
-    result.savechanges = async () => { return createQueryResultType<T, D>((await database.save<T>(result as any, false, undefined, true))[0], database) };
-    result.update = async (...keys: any[]) => {
-        if (!keys || keys.length <= 0)
-            return;
-        const kItem = { tableName: (result as any).tableName, id: (result as any).id } as IBaseModule<any>;
-        keys.forEach(k => {
-            kItem[k] = result[k];
-        });
-        await database.save<T>(kItem as any, false, undefined, true);
-        if ((result as any).id == 0 || (result as any).id === undefined)
-            (result as any).id = kItem.id;
-    }
-    result.delete = async () => await database.delete(result as any);
-    if (children && children.length > 0) {
-        for (var x of children) {
-            if (x.childTableName.length > 0 && x.childProperty.length > 0 && x.parentProperty.length > 0 && x.parentTable.length > 0 && x.assignTo.length > 0) {
-                if (item[x.parentProperty] === undefined) {
-                    if (x.isArray)
-                        item[x.assignTo] = [];
-                    continue;
-                }
-                var filter = {} as any
-                filter[x.childProperty] = item[x.parentProperty];
-                var items = await database.where(x.childTableName as D, filter);
-                if (x.isArray) {
-                    var r = [];
-                    for (var m of items)
-                        r.push(await createQueryResultType(m, database))
-                    item[x.assignTo] = r;
-                }
-                else {
-                    if (items.length > 0) {
-                        item[x.assignTo] = await createQueryResultType<T, D>(items[0], database);
-                    }
-                }
-            }
-        }
-    }
-    return result;
-}
-
-
-export const translateToSqliteValue = (v: any) => {
-    if (v === null || v === undefined)
-        return v;
-    if (isDate(v))
-        return (v as Date).toISOString();
-    if (typeof v === "boolean")
-        return v === true ? 1 : 0;
-    return v;
-}
-
-export const translateAndEncrypt = (v: any, database: IDataBaseExtender<string>, tableName: string, column?: string) => {
-    const table = database.tables.find(x => x.tableName == tableName);
-    const encryptValue = typeof v === "string" && column && table && table.props.find(f => f.columnName === column && f.encryptionKey) != undefined;
-    v = translateToSqliteValue(v);
-    if (encryptValue) {
-        v = encrypt(v, table.props.find(x => x.columnName === column).encryptionKey);
-    }
-
-    return v;
-}
-
-export const isDate = (v: any) => {
-    if (v === null || v === undefined)
-        return false;
-    if (Object.prototype.toString.call(v) === "[object Date]")
-        return true;
-    return false;
-}
-
-const encryptionsIdentifier = "#dbEncrypted&";
-
-export const encrypt = (str: string, key: string) => {
-    if (!str || str == "" || str.startsWith(encryptionsIdentifier))
-        return str; // already Encrypted
-    const hash = crypto.SHA256(key);
-    return encryptionsIdentifier + crypto.AES.encrypt(str, hash, { mode: crypto.mode.ECB }).toString();
-}
-
-export const oEncypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
-    if (!tableBuilder)
-        return item;
-    tableBuilder.props.filter(x => x.encryptionKey).forEach(x => {
-        const v = item[x.columnName];
-        if (v)
-            item[x.columnName] = encrypt(v, x.encryptionKey);
-    });
-    return item;
-}
-
-export const translateSimpleSql = (database: any, tableName: string, query?: any) => {
-    var q = `SELECT * FROM ${tableName} ${query ? 'WHERE ' : ''}`;
-    var values = [] as any[];
-    if (query && Object.keys(query).length > 0) {
-        const table = database.tables.find(x => x.tableName == tableName);
-        const keys = Object.keys(query);
-        keys.forEach((x, i) => {
-            var start = x.startsWith('$') ? x.substring(0, x.indexOf('-')).replace('-', '') : undefined;
-            const columnName = start ? x.replace("$in-", "").trim() : x.trim();
-            const column = table ? table.props.find(f => f.columnName === columnName) : undefined;
-            if (!start) {
-                q += x + '=? ' + (i < keys.length - 1 ? 'AND ' : '');
-                let v = query[x];
-                if (column)
-                    v = translateAndEncrypt(v, database, tableName, columnName);
-                values.push(v);
-            } else {
-                if (start == '$in') {
-                    let v = query[x] as [];
-                    q += x.replace("$in-", "") + ' IN (';
-                    v.forEach((item: any, index) => {
-                        q += '?' + (index < v.length - 1 ? ', ' : '');
-                        if (column)
-                            item = translateAndEncrypt(item, database, tableName, columnName);
-                        values.push(item);
-                    });
-                }
-                q += ') ' + (i < keys.length - 1 ? 'AND ' : '');
-            }
-        });
-    }
-
-    return { sql: q, args: values };
-}
-
-export const jsonToSqlite = (query: any) => {
-    try {
-        const builder = jsonsql();
-        const sql = builder.build(query);
-        sql.query = sql.query.replace(/\"/g, '');
-        const vArray = [];
-        for (const key in sql.values) {
-            while (sql.query.indexOf('$' + key) !== -1) {
-                sql.query = sql.query.replace('$' + key, '?');
-                vArray.push(sql.values[key]);
-            }
-        }
-        const sqlResult = { sql: sql.query, args: vArray };
-        return sqlResult;
-    } catch (e) {
-        console.error(e);
-        throw e;
-    }
-};
-
-export const oDecrypt = (item: any, tableBuilder?: TableBuilder<any, string>) => {
-    if (!tableBuilder)
-        return item;
-    tableBuilder.props.filter(x => x.encryptionKey).forEach(x => {
-        const v = item[x.columnName];
-        if (v)
-            item[x.columnName] = decrypt(v, x.encryptionKey);
-    });
-
-    return item;
-}
-
-export const decrypt = (str: string, key: string) => {
-    if (!str || str == "" || !str.startsWith(encryptionsIdentifier))
-        return str;
-    const hash = crypto.SHA256(key);
-    str = str.substring(encryptionsIdentifier.length)
-    const bytes = crypto.AES.decrypt(str, hash, { mode: crypto.mode.ECB });
-    const originalText = bytes.toString(crypto.enc.Utf8);
-    return originalText;
-}
-
-
-export const validateTableName = function <T extends IId<D>, D extends string>(item: T, tableName?: D) {
-    if (!(item as any).tableName || (item as any).tableName.length <= 2)
-        if (!tableName)
-            throw "TableName cannot be null, This item could not be saved"
-        else (item as any).tableName = tableName;
-
-    return (item as any) as IBaseModule<D>;
-}
-
-export const single = function <T>(items: any[]) {
-    if (!items || items.length === undefined || items.length <= 0)
-        return undefined;
-    return items[0] as T;
-}
-
-
+import {createQueryResultType} from './UsefullMethods'
+import {Functions} from './UsefullMethods'
 
 class ChildQueryLoader<T, B extends IId<D>, D extends string> implements IChildQueryLoader<T, B, D> {
     private parent: Query<B, D>;
@@ -226,22 +24,16 @@ class ChildQueryLoader<T, B extends IId<D>, D extends string> implements IChildQ
     }
 }
 
-export const isFunc = (value: any) => {
-    if (value === null || value === undefined || value.toString === undefined)
-        return false;
-    if (typeof value === "function")
-        return true;
-    return value.toString().indexOf('function') !== -1;
-};
+
 
 const isColumnFunc = (value: any) => {
-    if (isFunc(value) && value.toString().indexOf("_column ") !== -1)
+    if (Functions.isFunc(value) && value.toString().indexOf("_column ") !== -1)
         return true;
     return false;
 }
 
 export const getColumns = (fn: any) => {
-    if (!isFunc(fn))
+    if (!Functions.isFunc(fn))
         return fn;
     var str = fn.toString()
     if (str.indexOf('.') !== -1) {
@@ -623,7 +415,7 @@ export class Query<T extends IId<D>, D extends string> implements IQuery<T, D>{
                     appendSql("like");
                     break;
                 default: {
-                    if (isFunc(value)) appendSql(getColumns(value) ?? '');
+                    if (Functions.isFunc(value)) appendSql(getColumns(value) ?? '');
                     else if (value.queryValue !== undefined && (pValue === Param.IN || pValue == Param.NotIn)
                     ) {
                         const prevColumn = this.prevColumn(queries);
@@ -632,21 +424,21 @@ export class Query<T extends IId<D>, D extends string> implements IQuery<T, D>{
                             : [value.queryValue];
                         appendSql(`( ${v.map((x) => '?').join(',')} )`);
                         v.forEach((x) => {
-                            if (x !== undefined) result.values.push(translateAndEncrypt(x, this.database, this.tableName, prevColumn));
+                            if (x !== undefined) result.values.push(Functions.translateAndEncrypt(x, this.database, this.tableName, prevColumn));
                         });
                     } else if (value.queryValue !== undefined) {
                         const prevColumn = this.prevColumn(queries);
                         if (pValue == Param.Contains || pValue == Param.StartWith || pValue == Param.EndWith) {
                             if (pValue == Param.Contains)
-                                value = { queryValue: `%${translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}%` }
+                                value = { queryValue: `%${Functions.translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}%` }
                             else if (pValue == Param.StartWith)
-                                value = { queryValue: `${translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}%` }
-                            else value = { queryValue: `%${translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}` }
-                        } else value.queryValue = translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)
+                                value = { queryValue: `${Functions.translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}%` }
+                            else value = { queryValue: `%${Functions.translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)}` }
+                        } else value.queryValue = Functions.translateAndEncrypt(value.queryValue, this.database, this.tableName, prevColumn)
 
                         appendSql('?');
                         if (Array.isArray(value.queryValue))
-                            value.queryValue = (value.queryValue as []).map(x => translateAndEncrypt(x, this.database, this.tableName, prevColumn)).join(',');
+                            value.queryValue = (value.queryValue as []).map(x => Functions.translateAndEncrypt(x, this.database, this.tableName, prevColumn)).join(',');
                         result.values.push(value.queryValue);
                     }
                 }
@@ -668,14 +460,14 @@ export class Query<T extends IId<D>, D extends string> implements IQuery<T, D>{
     async firstOrDefault() {
         var item = this.getQueryResult();
         console.log("Execute firstOrDefault:" + item.sql)
-        var tItem = single(await this.database.find(item.sql, item.values, this.tableName));
+        var tItem = Functions.single<any>(await this.database.find(item.sql, item.values, this.tableName))
         return tItem ? await createQueryResultType<T, D>(tItem, this.database, this.Children) : undefined;
     }
 
     async findOrSave(item: T & IBaseModule<D>) {
         var sqls = this.getQueryResult();
         (item as any).tableName = this.tableName;
-        var dbItem = single(await this.database.find(sqls.sql, sqls.values, this.tableName));
+        var dbItem = Functions.single<any>(await this.database.find(sqls.sql, sqls.values, this.tableName))
         if (!dbItem) {
             dbItem = (await this.database.save<T>(item, false, this.tableName))[0];
 

@@ -1,10 +1,12 @@
 import { IBaseModule, IWatcher, IQuery, IDatabase, Operation, ColumnType, ITableBuilder, IUseQuery, IQueryResultItem, SOperation, TempStore, WatchIdentifier, IId } from './expo.sql.wrapper.types'
-import { createQueryResultType, validateTableName, Query, single, oEncypt, oDecrypt, isDate, CreateSqlInstaceOfType, jsonToSqlite, translateAndEncrypt, translateSimpleSql, getAvailableKeys } from './SqlQueryBuilder'
+import {  Query } from './SqlQueryBuilder'
 import { TableBuilder } from './TableStructor'
 import * as SQLite from 'expo-sqlite';
 import { ResultSet } from 'expo-sqlite';
 import BulkSave from './BulkSave';
 import UseQuery from './hooks/useQuery'
+import QuerySelector, { IQuerySelector } from './QuerySelector';
+import {createQueryResultType, Functions} from './UsefullMethods'
 
 export default function <D extends string>(databaseTables: ITableBuilder<any, D>[], getDatabase: () => Promise<SQLite.WebSQLDatabase>, onInit?: (database: IDatabase<D>) => Promise<void>, disableLog?: boolean) {
     return new Database<D>(databaseTables, getDatabase, onInit, disableLog) as IDatabase<D>;
@@ -143,7 +145,7 @@ class Database<D extends string> implements IDatabase<D> {
     public async triggerWatch<T extends IBaseModule<D>>(items: T | T[], operation: SOperation, subOperation?: Operation, tableName?: D, identifier?: WatchIdentifier) {
         try {
             const tItems = Array.isArray(items) ? items : [items];
-            var s = single(tItems) as any;
+            var s = Functions.single(tItems);
             if (s && !tableName && s && s.tableName)
                 tableName = s.tableName;
             if (!tableName)
@@ -192,7 +194,7 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     private localSave<T>(item?: IBaseModule<D>, insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
-        validateTableName(item, tableName);
+        Functions.validateTableName(item, tableName);
         const key = "localSave" + item.tableName;
         return new Promise(async (resolve, reject) => {
             try {
@@ -204,7 +206,7 @@ class Database<D extends string> implements IDatabase<D> {
                 this.operations.set(key, true);
                 this.log('Executing Save...');
                 const uiqueItem = await this.getUique(item);
-                const keys = getAvailableKeys(await this.allowedKeys(item.tableName, true), item);
+                const keys = Functions.getAvailableKeys(await this.allowedKeys(item.tableName, true), item);
                 const sOperations = uiqueItem ? "UPDATE" : "INSERT";
                 let query = '';
                 let args = [] as any[];
@@ -231,7 +233,7 @@ class Database<D extends string> implements IDatabase<D> {
                 }
                 keys.forEach((k: string, i) => {
                     let v = (item as any)[k] ?? null;
-                    v = translateAndEncrypt(v, this as any, item.tableName, k);
+                    v = Functions.translateAndEncrypt(v, this as any, item.tableName, k);
                     args.push(v);
                 });
                 if (uiqueItem)
@@ -265,7 +267,7 @@ class Database<D extends string> implements IDatabase<D> {
 
     private async getUique(item: IBaseModule<D>) {
         if (item.id != undefined && item.id > 0)
-            return single<IBaseModule<D>>(await this.where<IBaseModule<D>>(item.tableName, { id: item.id }));
+            return Functions.single(await this.where<IBaseModule<D>>(item.tableName, { id: item.id }))
         this.log('Executing getUique...');
         const trimValue = (value: any) => {
             if (typeof value === "string")
@@ -289,7 +291,7 @@ class Database<D extends string> implements IDatabase<D> {
         if (!addedisUnique)
             return undefined;
 
-        return single<IBaseModule<D>>(await this.where<IBaseModule<D>>(item.tableName, filter));
+        return Functions.single(await this.where<IBaseModule<D>>(item.tableName, filter))
     }
 
     private async selectLastRecord<T>(item: IBaseModule<D>) {
@@ -298,7 +300,7 @@ class Database<D extends string> implements IDatabase<D> {
             this.log('TableName cannot be empty for:', item);
             return;
         }
-        return single(((await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName))).map((x: any) => { x.tableName = item.tableName; return x; })) as T | undefined
+        return Functions.single<T>(((await this.find(!item.id || item.id <= 0 ? `SELECT * FROM ${item.tableName} ORDER BY id DESC LIMIT 1;` : `SELECT * FROM ${item.tableName} WHERE id=?;`, item.id && item.id > 0 ? [item.id] : undefined, item.tableName))).map((x: any) => { x.tableName = item.tableName; return x; }))
     }
 
     private wait(ms?: number) {
@@ -419,9 +421,10 @@ class Database<D extends string> implements IDatabase<D> {
                         reject(error);
                         return;
                     }
-                    if (single<any>(result)?.error) {
-                        console.error(single<any>(result)?.error);
-                        reject(single<any>(result)?.error);
+                    const arr = Array.isArray(result) ? result : [result];
+                    if (Functions.single<any>(arr)?.error) {
+                        console.error(Functions.single<any>(arr)?.error);
+                        reject(Functions.single<any>(arr)?.error);
                         return;
                     }
                     const table = this.tables.find(x => x.tableName === tableName);
@@ -450,7 +453,7 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     public async asQueryable<T extends IId<D>>(item: (IId<D> | IBaseModule<D>), tableName?: D) {
-        validateTableName(item, tableName);
+        Functions.validateTableName(item, tableName);
         var db = this as IDatabase<D>
         return await createQueryResultType<T, D>(item as any, db);
 
@@ -459,6 +462,10 @@ class Database<D extends string> implements IDatabase<D> {
     public query<T extends IId<D>>(tableName: D) {
         var db = this as IDatabase<D>
         return ((new Query<T, D>(tableName, db)) as IQuery<T, D>);
+    }
+
+    public querySelector<T extends IId<D>>(tableName: D) {
+        return new QuerySelector(tableName, this) as IQuerySelector<T, D>;
     }
 
     public async save<T extends IId<D>>(items: (T & T) | ((T & T)[]), insertOnly?: Boolean, tableName?: D, saveAndForget?: boolean) {
@@ -478,7 +485,7 @@ class Database<D extends string> implements IDatabase<D> {
     async delete(items: IId<D> | (IId<D>[]), tableName?: D) {
         try {
             var tItems = (Array.isArray(items) ? items : [items]).reduce((v, c) => {
-                const x = validateTableName(c, tableName);
+                const x = Functions.validateTableName(c, tableName);
                 if (v[x.tableName])
                     v[x.tableName].push(c);
                 else v[x.tableName] = [c];
@@ -500,12 +507,12 @@ class Database<D extends string> implements IDatabase<D> {
     }
 
     async jsonToSql<T>(jsonQuery: any, tableName?: D) {
-        const query = jsonToSqlite(jsonQuery);
+        const query = Functions.jsonToSqlite(jsonQuery);
         return ((await this.find(query.sql, query.args, tableName)) as any) as T[];
     }
 
     async where<T extends IId<D>>(tableName: D, query?: any | T) {
-        const q = translateSimpleSql(this, tableName, query);
+        const q = Functions.translateSimpleSql(this, tableName, query);
         return ((await this.find(q.sql, q.args, tableName)) as any) as T[];
     }
 
@@ -521,10 +528,10 @@ class Database<D extends string> implements IDatabase<D> {
                     this.operations.delete(key);
                     return;
                 }
-                if (single<any>(result)?.error) {
-                    console.error('Could not execute query:', query, single<any>(result)?.error);
-                    reject(single<any>(result)?.error);
-                    this.operations.delete(key);
+                const arr = Array.isArray(result) ? result : [result];
+                if (Functions.single<any>(arr)?.error) {
+                    console.error(Functions.single<any>(arr)?.error);
+                    reject(Functions.single<any>(arr)?.error);
                     return;
                 }
                 const data = result as ResultSet[]
@@ -562,9 +569,9 @@ class Database<D extends string> implements IDatabase<D> {
                         if (tableName)
                             item.tableName = tableName;
                         let translatedItem = translateKeys(item)
-                        oDecrypt(translatedItem, table);
+                        Functions.oDecrypt(translatedItem, table);
                         if (table && table.typeProptoType)
-                            translatedItem = CreateSqlInstaceOfType(table.typeProptoType, translatedItem);
+                            translatedItem = Functions.createSqlInstaceOfType(table.typeProptoType, translatedItem);
                         const rItem = (table && table.itemCreate ? table.itemCreate(translatedItem) : translatedItem);
                         items.push(rItem);
                     }

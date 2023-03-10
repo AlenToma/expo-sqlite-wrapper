@@ -1,6 +1,7 @@
 import * as SqlLite from 'expo-sqlite'
 import { TableBuilder } from './TableStructor';
 import BulkSave from './BulkSave';
+import { IQuerySelector } from './QuerySelector';
 
 export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime";
 
@@ -106,6 +107,7 @@ export declare type StringValue = string | undefined;
 
 export type IDataBaseExtender<D extends string> = {
     tables: TableBuilder<any, D>[];
+    dbTable: TableBuilder<any, D>[];
     triggerWatch: <T extends IBaseModule<D>>(items: T | T[], operation: SOperation, subOperation?: Operation, tableName?: D) => Promise<void>;
 } & IDatabase<D>
 
@@ -292,8 +294,15 @@ export interface IDatabase<D extends string> {
     watch: <T extends IId<D>>(tableName: D) => IWatcher<T, D>;
     /**
      * Create IQuery object.
+     * @deprecated since version 1.4.3 use querySelector instead
      */
     query: <T extends IId<D>>(tableName: D) => IQuery<T, D>;
+
+    /**
+     * More advanced queryBuilder
+     * It include join and aggregators and better validations
+     */
+    querySelector: <T extends IId<D>>(tabelName: D) => IQuerySelector<T, D>;
     /**
      * execute sql eg
      * query: select * from users where name = ?

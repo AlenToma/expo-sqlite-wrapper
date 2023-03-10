@@ -1,5 +1,5 @@
 import { IBaseModule, IDatabase, IDataBaseExtender } from "./expo.sql.wrapper.types";
-import { encrypt, isDate, oEncypt, getAvailableKeys } from "./SqlQueryBuilder";
+import { Functions } from "./UsefullMethods";
 import * as SQLite from 'expo-sqlite';
 
 export default class BulkSave<T, D extends string> {
@@ -19,7 +19,7 @@ export default class BulkSave<T, D extends string> {
         const table = this.dbContext.tables.find(x => x.tableName == this.tableName);
         itemArray.forEach(item => {
             const q = { sql: `INSERT INTO ${this.tableName} (`, args: [] };
-            const keys = getAvailableKeys(this.keys, item);
+            const keys = Functions.getAvailableKeys(this.keys, item);
             keys.forEach((k, i) => {
                 q.sql += k + (i < keys.length - 1 ? ',' : '');
             });
@@ -32,12 +32,12 @@ export default class BulkSave<T, D extends string> {
             keys.forEach((k: string, i) => {
                 const column = table?.props.find(x => x.columnName == k && x.encryptionKey);
                 let v = (item as any)[k] ?? null;
-                if (isDate(v))
+                if (Functions.isDate(v))
                     v = v.toISOString();
                 if (typeof v === "boolean")
                     v = v === true ? 1 : 0;
                 if (column)
-                    v = encrypt(v, column.encryptionKey);
+                    v = Functions.encrypt(v, column.encryptionKey);
                 q.args.push(v);
             });
 
@@ -51,7 +51,7 @@ export default class BulkSave<T, D extends string> {
         const table = this.dbContext.tables.find(x => x.tableName == this.tableName);
         itemArray.forEach(item => {
             const q = { sql: `UPDATE ${this.tableName} SET `, args: [] };
-            const keys = getAvailableKeys(this.keys, item);
+            const keys = Functions.getAvailableKeys(this.keys, item);
             keys.forEach((k, i) => {
                 q.sql += ` ${k}=? ` + (i < keys.length - 1 ? ',' : '');
             });
@@ -59,12 +59,12 @@ export default class BulkSave<T, D extends string> {
             keys.forEach((k: string, i) => {
                 const column = table?.props.find(x => x.columnName == k && x.encryptionKey);
                 let v = (item as any)[k] ?? null;
-                if (isDate(v))
+                if (Functions.isDate(v))
                     v = v.toISOString();
                 if (typeof v === "boolean")
                     v = v === true ? 1 : 0;
                 if (column)
-                    v = encrypt(v, column.encryptionKey);
+                    v = Functions.encrypt(v, column.encryptionKey);
                 q.args.push(v);
             });
             q.args.push(item.id);

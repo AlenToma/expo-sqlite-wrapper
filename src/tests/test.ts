@@ -1,6 +1,7 @@
 import 'should'
 import mocha from 'mocha'
-import { createQueryResultType, Query, jsonToSqlite, encrypt, decrypt, getAvailableKeys, translateSimpleSql } from '../SqlQueryBuilder';
+import { Query, } from '../SqlQueryBuilder';
+import {createQueryResultType, Functions} from '../UsefullMethods'
 import BulkSave from '../BulkSave';
 import TableBuilder from '../TableStructor'
 import crypto from 'crypto-js'
@@ -26,9 +27,9 @@ const item = {
 
 mocha.describe("testWhere", function () {
     console.log("testWhere")
-    const q = translateSimpleSql(database, "Test", { "$in-password": ["test", "hahaha"], name: "hey" })
-    const q2 = translateSimpleSql(database, "Test", { password: "test", name: "hey" })
-    const q3 = translateSimpleSql(database, "Test");
+    const q = Functions.translateSimpleSql(database, "Test", { "$in-password": ["test", "hahaha"], name: "hey" })
+    const q2 = Functions.translateSimpleSql(database, "Test", { password: "test", name: "hey" })
+    const q3 = Functions.translateSimpleSql(database, "Test");
     q.sql.should.eql("SELECT * FROM Test WHERE password IN (?, ?) AND name=? ");
     q.args[0].should.eql("#dbEncrypted&iwx3MskszSgNcP8QDQA7Ag==");
     q.args[2].should.eql("hey")
@@ -40,7 +41,7 @@ mocha.describe("testWhere", function () {
 
 
 mocha.describe("testgetAvailableKeys", function () {
-    const items = getAvailableKeys(["name", "id", "password"], {
+    const items = Functions.getAvailableKeys(["name", "id", "password"], {
         password: "test"
     })
 
@@ -48,8 +49,8 @@ mocha.describe("testgetAvailableKeys", function () {
 });
 
 mocha.describe("encryptions", function () {
-    const en = encrypt("test", "123")
-    const dec = decrypt(en, "123");
+    const en = Functions.encrypt("test", "123")
+    const dec = Functions.decrypt(en, "123");
     dec.should.eql("test")
 });
 
@@ -65,7 +66,7 @@ mocha.describe("readEncryption", function () {
 
 mocha.describe("JsonToSql", function () {
 
-    const sql = jsonToSqlite({
+    const sql = Functions.jsonToSqlite({
         type: 'select',
         table: 'DetaliItems',
         condition: { "DetaliItems.id": { $gt: 1 }, "DetaliItems.title": "Epic Of Caterpillar" },

@@ -2,14 +2,13 @@ import { IBaseModule, SingleValue, ArrayValue, StringValue, NumberValue, IQuery,
 import createDbContext from './Database'
 import TableBuilder from './TableStructor'
 import BulkSave from './BulkSave'
-import { encrypt, decrypt, oEncypt, oDecrypt } from './SqlQueryBuilder'
-
+import { Functions } from './UsefullMethods'
+import { IQuerySelector, IReturnMethods, IOrderBy, GenericQuery, JoinOn, IWhere, IHaving, IQueryColumnSelector, IColumnSelector, ArrayIColumnSelector, ArrayAndAliasIColumnSelector } from './QuerySelector'
 
 export default createDbContext
-
+const { encrypt, decrypt, oDecrypt, oEncypt } = Functions
 export {
     TableBuilder,
-    ColumnType,
     IBaseModule,
     BulkSave,
     encrypt,
@@ -25,5 +24,17 @@ export type {
     IQuery,
     IQueryResultItem,
     IDatabase,
-    IWatcher
+    IWatcher,
+    IQuerySelector,
+    IReturnMethods,
+    IOrderBy,
+    GenericQuery,
+    JoinOn,
+    IWhere,
+    IHaving,
+    IQueryColumnSelector,
+    ColumnType,
+    IColumnSelector,
+    ArrayIColumnSelector,
+    ArrayAndAliasIColumnSelector
 }
