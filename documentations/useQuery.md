@@ -33,7 +33,7 @@ Could be one of the folowing `(IQuery<T, D>) | (SQLite.Query) | (() => Promise<T
 
 The initiated data.
 
-### onItemChange
+### onDbItemChanged(Optional)
 
 When Changes Happend to the database, `useQuery` have to request `query` from the db, and incase the data is big, you could use this instead to skip the request to the database.
 
