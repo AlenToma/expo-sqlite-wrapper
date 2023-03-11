@@ -6,9 +6,12 @@ import { Errors, createQueryResultType, Functions, QValue } from './UsefullMetho
 export type IColumnSelector<T> = (x: T) => any;
 export type ArrayIColumnSelector<T> = (x: T) => any[];
 export type ArrayAndAliasIColumnSelector<T> = (x: T, as: <B>(column: B, alias: string) => B) => any[];
-export type InnerSelect = {
-    getInnerSelectSql: () => string;
+export type InnerSelect = { getInnerSelectSql: () => string; }
+export type IUnionSelectorParameter<T extends IId<D>, D extends string> = {
+    querySelector: <T extends IId<D>>(tabelName: D) => IQuerySelector<T, D>;
 }
+export type IUnionSelector<T extends IId<D>, D extends string> = (x: IUnionSelectorParameter<T, D>) => GlobalIQuerySelector;
+
 export type R<T, S extends string> = Record<S, T>;
 
 export type ConcatSeperatorChar = "||" | "+" | "-";
@@ -38,6 +41,8 @@ export enum Param {
     InnerJoin = '#INNER JOIN',
     LeftJoin = '#LEFT JOIN',
     RightJoin = '#RIGHT JOIN',
+    CrossJoin = "#CROSS JOIN",
+    Join = "#JOIN",
     Max = "#MAX",
     Min = "#MIN",
     Count = "#COUNT",
@@ -47,7 +52,14 @@ export enum Param {
     Avg = "#AVG",
     Between = "#BETWEEN",
     Value = "#Value",
-    Concat = "#Concat"
+    Concat = "#Concat",
+    Union = "#UNION",
+    UnionAll = "#UNION ALL",
+    Case = "#CASE",
+    When = "#WHEN",
+    Then = "#THEN",
+    Else = "#ELSE",
+    EndCase = "#END"
 }
 
 export declare type SingleValue =
@@ -61,7 +73,16 @@ export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
 export declare type StringValue = string | undefined;
 
-export interface IReturnMethods<T, D extends string> {
+export type GlobalIQuerySelector = {
+    /**
+     * get the translated sql
+     */
+    getSql: (sqlType: "DELETE" | "SELECT") => SqlLite.Query;
+
+    getInnerSelectSql: () => string;
+}
+
+export interface IReturnMethods<T, D extends string> extends GlobalIQuerySelector {
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     toList: () => Promise<IQueryResultItem<T, D>[]>;
     findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
@@ -69,12 +90,6 @@ export interface IReturnMethods<T, D extends string> {
     * delete based on Query above.
     */
     delete: () => Promise<void>;
-    /**
-     * get the translated sql
-     */
-    getSql: (sqlType: "DELETE" | "SELECT") => SqlLite.Query;
-
-    getInnerSelectSql: () => string;
 }
 
 
@@ -182,25 +197,78 @@ export interface GenericQuery<T, ParentType, D extends string, ReturnType> exten
      * select columns and aggregators
      */
     Select: IQueryColumnSelector<T, ParentType, D>;
+    /**
+    * Add Union Select
+    */
+    Union: <B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) => ReturnType;
+    /**
+     * Add UnionAll Select
+     */
+    UnionAll: <B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) => ReturnType;
+    /**
+     * start case
+     */
+    Case: GenericQueryWithValue<ReturnType> & ReturnType;
+    /**
+     * add When, work with case
+     */
+    When: GenericQueryWithValue<ReturnType> & ReturnType;
+    /**
+    * add Then, work with case
+    */
+    Then: GenericQueryWithValue<ReturnType> & ReturnType;
+    /**
+    * add Else, work with case
+    */
+    Else: GenericQueryWithValue<ReturnType> & ReturnType;
+    /**
+    * end case, work with case
+    */
+    EndCase: GenericQueryWithValue<ReturnType> & ReturnType;
+
+}
+
+export type GenericQueryWithValue<ReturnType> = {
+    /**
+    * Add simple Value, work best with case and else
+    */
+    Value: (value: SingleValue) => ReturnType;
+}
+
+export interface ISelectCase<T, ParentType, D extends string> extends Omit<GenericQuery<T, ParentType, D, ISelectCase<T, ParentType, D>>, "EndCase" | "getSql" | "getInnerSelectSql" | "Select" | "OrderByDesc" | "OrderByAsc" | "Limit" | "Union" | "UnionAll" | "GroupBy" | "Select" | "toList" | "firstOrDefault" | "findOrSave" | "delete"> {
+    EndCase: IQueryColumnSelector<T, ParentType, D>;
 }
 
 
-export interface JoinOn<T, ParentType, D extends string> extends Omit<GenericQuery<T, ParentType, D, JoinOn<T, ParentType, D>>, "GroupBy" | "Select" | "toList" | "firstOrDefault" | "findOrSave" | "delete"> {
+export interface IJoinOn<T, ParentType, D extends string> extends Omit<GenericQuery<T, ParentType, D, IJoinOn<T, ParentType, D>>, "GroupBy" | "Select" | "toList" | "firstOrDefault" | "findOrSave" | "delete"> {
     /**
      * Inner join a table
      * eg InnerJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
      */
-    InnerJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<T & R<B, S>, ParentType, D>;
+    InnerJoin: <B, S extends string>(tableName: D, alias: S) => IJoinOn<T & R<B, S>, ParentType, D>;
     /**
      * left join a table
      * eg LeftJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
      */
-    LeftJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<T & R<B, S>, ParentType, D>;
+    LeftJoin: <B, S extends string>(tableName: D, alias: S) => IJoinOn<T & R<B, S>, ParentType, D>;
+    /**
+    * join a table
+    * eg Join<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
+    * This will overwrite the above where, so use the Where that is returned by Join method instead
+    */
+    Join: <B, S extends string>(tableName: D, alias: S) => IJoinOn<T & R<B, S>, ParentType, D>;
+    /**
+    * CrossJoin a table
+    * eg CrossJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
+    * This will overwrite the above where, so use the Where that is returned by CrossJoin method instead
+    */
+    CrossJoin: <B, S extends string>(tableName: D, alias: S) => IJoinOn<T & R<B, S>, ParentType, D>;
     /**
      * right join a table
      * eg RightJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
+     * sqlite dose not currently support this
      */
-    RightJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<T & R<B, S>, ParentType, D>;
+    //RightJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<T & R<B, S>, ParentType, D>;
     Where: IWhere<T, ParentType, D>;
 };
 
@@ -232,24 +300,49 @@ export interface IQuerySelector<T, D extends string> extends IReturnMethods<T, D
     * eg InnerJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
     * This will overwrite the above where, so use the Where that is returned by InnerJoin method instead
     */
-    InnerJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+    InnerJoin: <B, S extends string>(tableName: D, alias: S) => IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
     /**
     * left join a table
     * eg LeftJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
     * This will overwrite the above where, so use the Where that is returned by LeftJoin method instead
     */
-    LeftJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+    LeftJoin: <B, S extends string>(tableName: D, alias: S) => IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
+    /**
+    * join a table
+    * eg Join<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
+    * This will overwrite the above where, so use the Where that is returned by Join method instead
+    */
+    Join: <B, S extends string>(tableName: D, alias: S) => IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
+    /**
+    * CrossJoin a table
+    * eg CrossJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
+    * This will overwrite the above where, so use the Where that is returned by CrossJoin method instead
+    */
+    CrossJoin: <B, S extends string>(tableName: D, alias: S) => IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
+    /**
+     * Add Union Select
+     */
+    Union: <B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) => IQuerySelector<T, D>
+    /**
+     * Add UnionAll Select
+     */
+    UnionAll: <B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) => IQuerySelector<T, D>
     /**
     * right join a table
     * eg RightJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
     * This will overwrite the above where, so use the Where that is returned by RightJoin method instead
+    * sqlite dose not currently support this
     */
-    RightJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+    //RightJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<R<T, 'a'> & R<B, S>, T, D>;
     LoadChildren: <B extends IId<D>>(child: D, childColumn: NonFunctionPropertyNames<B>, parentColumn: NonFunctionPropertyNames<T>, assignTo: NonFunctionPropertyNames<T>, isArray?: boolean) => IQuerySelector<T, D>;
     Select: IQueryColumnSelector<T, T, D>;
 };
 
 export interface IQueryColumnSelector<T, ParentType, D extends string> extends IReturnMethods<ParentType, D> {
+    /**
+     * start a case, and end it with CaseEnd()
+     */
+    Case: (alias: string) => ISelectCase<T, ParentType, D>;
     /**
      * Default is select * from
      * you can specify the columns here
@@ -292,6 +385,9 @@ export interface IQueryColumnSelector<T, ParentType, D extends string> extends I
     * incase you join data, then you will need to cast or convert the result to other type
     */
     Cast: <B>(converter?: (x: T | unknown) => B) => IReturnMethods<B, D>;
+    /**
+    * add having search
+    */
     Having: IHaving<T, ParentType, D>;
 }
 
@@ -336,9 +432,23 @@ class ReturnMethods<T, ParentType extends IId<D>, D extends string>{
 
 class QueryColumnSelector<T, ParentType extends IId<D>, D extends string> extends ReturnMethods<T, ParentType, D>{
     columns: QValue[];
+    cases: ISelectCase<T, ParentType, D>[];
     constructor(parent: QuerySelector<any, D>) {
         super(parent)
         this.columns = [];
+        this.cases = [];
+    }
+
+    Case(alias: string) {
+        const caseItems = new Where<T, ParentType, D>(this.parent.tableName, this.parent, alias, Param.Case)
+        Object.defineProperty(caseItems, "EndCase", {
+            get: () => {
+                caseItems.Queries.push(QValue.Q.Args(Param.EndCase));
+                return this;
+            }
+        })
+        this.cases.push(caseItems as any);
+        return caseItems as any as ISelectCase<T, ParentType, D>;
     }
 
     Cast<B>(converter: (x: ParentType | unknown) => B) {
@@ -423,6 +533,36 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
         this.Queries = queries.map((x: any) => x.type != "QValue" ? QValue.Q.Args(x) : x);
         this.tableName = tableName;
         this.alias = alias;
+    }
+
+    get Case() {
+        this.Queries.push(QValue.Q.Args(Param.Case))
+        return this;
+    }
+
+    get When() {
+        this.Queries.push(QValue.Q.Args(Param.When))
+        return this;
+    }
+
+    get Then() {
+        this.Queries.push(QValue.Q.Args(Param.Then))
+        return this;
+    }
+
+    get EndCase() {
+        this.Queries.push(QValue.Q.Args(Param.EndCase))
+        return this;
+    }
+
+    get Else() {
+        this.Queries.push(QValue.Q.Args(Param.Else))
+        return this;
+    }
+
+    Value(value: SingleValue) {
+        this.Queries.push(QValue.Q.Args(Param.Value).Value(value));
+        return this;
     }
 
     Between(value1: SingleValue | IColumnSelector<T>, value2: SingleValue | IColumnSelector<T>) {
@@ -606,7 +746,22 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
             this.parent,
             alias,
             Param.InnerJoin
-        ) as any as JoinOn<T & R<B, S>, T, D>;
+        ) as any as IJoinOn<T & R<B, S>, T, D>;
+        this.parent.joins.push(join as any);
+        return join;
+    }
+
+    CrossJoin<B, S extends string>(tableName: D, alias: S) {
+        this.parent.clear();
+        if (this.alias == alias || this.parent.joins.find((x) => x.alias == alias))
+            throw `alias can not be ${alias}, it is already in use`;
+        this.parent.buildJsonExpression(tableName, alias);
+        const join = new Where<T & R<B, S>, ParentType, D>(
+            tableName,
+            this.parent,
+            alias,
+            Param.CrossJoin
+        ) as any as IJoinOn<T & R<B, S>, T, D>;
         this.parent.joins.push(join as any);
         return join;
     }
@@ -621,7 +776,22 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
             this.parent,
             alias,
             Param.LeftJoin
-        ) as any as JoinOn<T & R<B, S>, T, D>;
+        ) as any as IJoinOn<T & R<B, S>, T, D>;
+        this.parent.joins.push(join as any);
+        return join;
+    }
+
+    Join<B, S extends string>(tableName: D, alias: S) {
+        this.parent.clear();
+        if (this.alias == alias || this.parent.joins.find((x) => x.alias == alias))
+            throw `alias can not be ${alias}, it is already in use`;
+        this.parent.buildJsonExpression(tableName, alias);
+        const join = new Where<T & R<B, S>, ParentType, D>(
+            tableName,
+            this.parent,
+            alias,
+            Param.Join
+        ) as any as IJoinOn<T & R<B, S>, T, D>;
         this.parent.joins.push(join as any);
         return join;
     }
@@ -636,9 +806,19 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
             this.parent,
             alias,
             Param.RightJoin
-        ) as any as JoinOn<T & R<B, S>, T, D>;
+        ) as any as IJoinOn<T & R<B, S>, T, D>;
         this.parent.joins.push(join as any);
         return join;
+    }
+
+    Union<B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) {
+        queryselectors.forEach(x => this.parent.unions.push({ type: Param.Union, value: x(this.parent.database) }));
+        return this;
+    }
+
+    UnionAll<B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) {
+        queryselectors.forEach(x => this.parent.unions.push({ type: Param.UnionAll, value: x(this.parent.database) }));
+        return this;
     }
 
 
@@ -654,10 +834,12 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
 }
 
 
+
 export default class QuerySelector<T extends IId<D>, D extends string> {
     where?: Where<any, any, D>;
     having?: Where<any, any, D>;
     joins: Where<any, any, D>[];
+    unions: { type: Param.Union | Param.UnionAll, value: GlobalIQuerySelector }[];
     tableName: D;
     alias: string;
     queryColumnSelector?: QueryColumnSelector<any, any, D>;
@@ -677,6 +859,7 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
         this.buildJsonExpression(tableName, "a");
         this.others = [];
         this.children = [];
+        this.unions = [];
     }
 
     clear() {
@@ -693,6 +876,16 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
         return this.queryColumnSelector;
     }
 
+    Union<B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) {
+        queryselectors.forEach(x => this.unions.push({ type: Param.Union, value: x(this.database) }));
+        return this;
+    }
+
+    UnionAll<B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) {
+        queryselectors.forEach(x => this.unions.push({ type: Param.UnionAll, value: x(this.database) }));
+        return this;
+    }
+
     InnerJoin<B, S extends string>(tableName: D, alias: S) {
         if (this.alias == alias || this.joins.find((x) => x.alias == alias))
             throw `alias can not be ${alias}, it is already in use`;
@@ -704,7 +897,23 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
             this,
             alias as any,
             Param.InnerJoin
-        ) as any as JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+        ) as any as IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
+        this.joins.push(join as any);
+        return join;
+    }
+
+    CrossJoin<B, S extends string>(tableName: D, alias: S) {
+        if (this.alias == alias || this.joins.find((x) => x.alias == alias))
+            throw `alias can not be ${alias}, it is already in use`;
+        this.alias = 'a';
+        this.buildJsonExpression(tableName, alias);
+        this.others = [];
+        const join = new Where<T & R<B, S>, T, D>(
+            tableName,
+            this,
+            alias as any,
+            Param.CrossJoin
+        ) as any as IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
         this.joins.push(join as any);
         return join;
     }
@@ -720,7 +929,23 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
             this,
             alias,
             Param.LeftJoin
-        ) as any as JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+        ) as any as IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
+        this.joins.push(join as any);
+        return join;
+    }
+
+    Join<B, S extends string>(tableName: D, alias: S) {
+        if (this.alias == alias || this.joins.find((x) => x.alias == alias))
+            throw `alias can not be ${alias}, it is already in use`;
+        this.alias = 'a';
+        this.buildJsonExpression(tableName, alias);
+        this.others = [];
+        const join = new Where<T & R<B, S>, T, D>(
+            tableName,
+            this,
+            alias,
+            Param.Join
+        ) as any as IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
         this.joins.push(join as any);
         return join;
     }
@@ -736,7 +961,7 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
             this,
             alias,
             Param.RightJoin
-        ) as any as JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+        ) as any as IJoinOn<R<T, 'a'> & R<B, S>, T, D>;
         this.joins.push(join as any);
         return join;
     }

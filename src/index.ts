@@ -3,7 +3,7 @@ import createDbContext from './Database'
 import TableBuilder from './TableStructor'
 import BulkSave from './BulkSave'
 import { Functions } from './UsefullMethods'
-import { IQuerySelector, IReturnMethods, IOrderBy, GenericQuery, JoinOn, IWhere, IHaving, IQueryColumnSelector, IColumnSelector, ArrayIColumnSelector, ArrayAndAliasIColumnSelector } from './QuerySelector'
+import { IQuerySelector, IReturnMethods, IOrderBy, GenericQuery, IJoinOn, IWhere, IHaving, IQueryColumnSelector, IColumnSelector, ArrayIColumnSelector, ArrayAndAliasIColumnSelector } from './QuerySelector'
 
 export default createDbContext
 const { encrypt, decrypt, oDecrypt, oEncypt } = Functions
@@ -29,7 +29,7 @@ export type {
     IReturnMethods,
     IOrderBy,
     GenericQuery,
-    JoinOn,
+    IJoinOn,
     IWhere,
     IHaving,
     IQueryColumnSelector,

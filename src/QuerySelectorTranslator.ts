@@ -5,11 +5,9 @@ import { Counter, StringBuilder, Functions } from './UsefullMethods'
 export default class QuerySelectorTranslator {
     selector: QuerySelector<any, string>;
     querySelectorSql: StringBuilder;
-    sql: Map<string, SqlLite.Query>;
     constructor(selector: QuerySelector<any, any>) {
         this.selector = selector;
         this.querySelectorSql = new StringBuilder();
-        this.sql = new Map();
     }
 
     private translateDeleteColumn() {
@@ -17,7 +15,7 @@ export default class QuerySelectorTranslator {
         return sql.append("DELETE FROM", this.selector.tableName);
     }
 
-    private translateColumns() {
+    private translateColumns(args: any[]) {
         let sql = new StringBuilder();
         if (!this.selector.queryColumnSelector)
             return sql.append("SELECT * FROM", this.selector.tableName, this.selector.joins.length > 0 ? "as a" : "")
@@ -59,6 +57,14 @@ export default class QuerySelectorTranslator {
                     break;
             }
         }
+        this.selector.queryColumnSelector.cases.forEach(x => {
+            const item = x as any as Where<any, any, string>
+            const c = this.translateWhere(item, args);
+            if (!c.isEmpty)
+                sql.append("(", c.toString(), ")", "as", item.alias);
+        });
+
+
         if (!addedColumns && !sql.isEmpty)
             sql.append("*")
 
@@ -110,7 +116,10 @@ export default class QuerySelectorTranslator {
         while (counter.hasNext) {
             const value = counter.next;
             const joinType = value.Queries[0];
-            sql.append(`${joinType.args.substring(1)} ${value.tableName} as ${value.alias} ON ${this.translateWhere(value, args)}`);
+            const joinWhere = this.translateWhere(value, args);
+            if (!joinWhere.isEmpty)
+                sql.append(`${joinType.args.substring(1)} ${value.tableName} as ${value.alias} ON ${joinWhere.toString()}`);
+            else sql.append(`${joinType.args.substring(1)} ${value.tableName} as ${value.alias}`);
         }
 
         return sql;
@@ -170,6 +179,11 @@ export default class QuerySelectorTranslator {
                 case Param.EndParameter:
                 case Param.Not:
                 case Param.Between:
+                case Param.Case:
+                case Param.When:
+                case Param.Then:
+                case Param.EndCase:
+                case Param.Else:
                     sql.append(value.args.substring(1));
                     break;
                 case Param.Value:
@@ -214,12 +228,13 @@ export default class QuerySelectorTranslator {
     translateToInnerSelectSql() {
         const sqlQuery = this.translate("SELECT");
         const sql = new StringBuilder(sqlQuery.sql);
+        const args = [...sqlQuery.args];
         const tempQuestionMark = "#questionMark"
         const c = "?";
-        while (sql.indexOf(c) !== -1 && sqlQuery.args.length > 0) {
+        while (sql.indexOf(c) !== -1 && args.length > 0) {
             {
 
-                let value = sqlQuery.args.shift();
+                let value = args.shift();
                 if (Functions.isDefained(value) && typeof value === "string") {
                     if (value.indexOf(c) !== -1)
                         value = value.replace(new RegExp("\\" + c, "gmi"), tempQuestionMark)
@@ -237,15 +252,14 @@ export default class QuerySelectorTranslator {
     translate(selectType: "SELECT" | "DELETE") {
         try {
             const args = [] as any[];
-            if (this.sql.has(selectType))
-                return this.sql.get(selectType);
+            const selectcColumnSql = selectType == "DELETE" ? this.translateDeleteColumn() : this.translateColumns(args);
             const whereSql = this.selector.where ? this.translateWhere(this.selector.where, args) : new StringBuilder();
             const groupBy = this.selector.others.filter(x => x.args === Param.GroupBy).map(x => x.getColumn(this.selector.jsonExpression));
             const otherSql = this.translateOthers();
             const joinSql = selectType === "SELECT" ? this.translateJoins(args) : new StringBuilder();
             const havingSql = this.selector.having && selectType === "SELECT" ? this.translateWhere(this.selector.having, args) : new StringBuilder();
-            const selectcColumnSql = selectType == "DELETE" ? this.translateDeleteColumn() : this.translateColumns();
             const sql = new StringBuilder(selectcColumnSql.toString().trim());
+
             if (!joinSql.isEmpty && selectType == "SELECT")
                 sql.append(joinSql.toString().trim());
             if (!whereSql.isEmpty)
@@ -256,9 +270,15 @@ export default class QuerySelectorTranslator {
                 sql.append("HAVING", havingSql.toString().trim());
             if (!otherSql.isEmpty && selectType == "SELECT")
                 sql.append(otherSql.toString().trim());
+            if (selectType == "SELECT" && this.selector.unions.length > 0) {
+                this.selector.unions.forEach(x => {
+                    const q = x.value.getSql("SELECT");
+                    sql.append(x.type.substring(1), q.sql);
+                    q.args.forEach(a => args.push(a));
+                });
+            }
 
-            this.sql.set(selectType, { sql: sql.toString().trim(), args: args });
-            return this.sql.get(selectType);
+            return { sql: sql.toString().trim(), args: args }
         } catch (e) {
             console.error(e);
             throw e;
