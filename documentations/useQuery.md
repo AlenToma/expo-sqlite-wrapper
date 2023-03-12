@@ -10,7 +10,7 @@ Here is how simple it is to use it.
 const Name =()=> {
  const [users, dataIsLoading] = 
   DbContext.database.useQuery("Users",
-  DbContext.select<DetaliItemSettings>("Users").Column("name").StartWith("t"));
+  DbContext.database.querySelector<DetaliItemSettings>("Users").Where.Column(x=> x.name).StartWith("t"));
 
 return (
     <>
