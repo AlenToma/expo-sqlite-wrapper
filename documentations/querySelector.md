@@ -28,7 +28,7 @@ query.Join<Child, "b">("Children", "b").Column(x=> x.a.id).EqualTo(x=> x.b.paren
 // You could also cast or convert your data to different objects
 const items = query.Join<Child, "b">("Children", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>().toList();
 // or to convert
-const item = query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>(x=> new MyJoinObject(x)).toList();
+const item = query.Join<Child, "b">("Children", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>(x=> new MyJoinObject(x)).toList();
 
 // You could also use inner select this will be converted to `select * from Parents where id in (select parentId from Childrens)`
 query.Where.Column(x=> x.id).IN(dbContext.database.querySelector<Child>("Childrens").Select.Columns(x=> [x.parentId]))
