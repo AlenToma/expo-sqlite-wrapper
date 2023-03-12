@@ -14,21 +14,21 @@ query.LoadChildren<Child>("Childrens", "parentId", "id", "children", true);
 query.Where.Column(x=> x.id).EqualTo(1);
 
 // you could join, left join, crossjoin , innerJoin and join
-query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.name).Not.IN(["test", "test"]);
+query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]);
 
 // You could Select
-query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.name).Not.IN(["test", "test"]).Select.Columns(x=> [x.a.id, x.b.name]);
+query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Columns(x=> [x.a.id, x.b.name]);
 
 // you could use sqlite aggrigatos like count, min, max and more
-query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Count(x=> "*", "AllRows");
+query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Count(x=> "*", "AllRows");
 
 // you could also use having
-query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5);
+query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5);
 
 // You could also cast or convert your data to different objects
-const items = query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>().toList();
+const items = query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>().toList();
 // or to convert
-const item = query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>(x=> new MyJoinObject(x)).toList();
+const item = query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Having.Column("idCount").GreaterThen(5).Cast<MyJoinObject>(x=> new MyJoinObject(x)).toList();
 
 // You could also use inner select this will be converted to `select * from Parents where id in ((select parentId from Childrens))`
 query.Where.Column(x=> x.id).IN(dbContext.database.querySelector<Child>("Childrens").Select.Columns(x=> [x.parentId]))
