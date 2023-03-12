@@ -32,7 +32,7 @@ export interface IDatabase<D extends string> {
      */
     disableWatchers: () => IDatabase<D>;
     /**
-     * Enabling Watchers will call all the frozen watchers that has not been called when it was frozen
+     * enabling Watchers will call all the frozen watchers that has not been called when it was frozen
      */
     enableWatchers: () => Promise<void>;
 
@@ -43,7 +43,7 @@ export interface IDatabase<D extends string> {
     disableHooks: () => IDatabase<D>;
 
     /**
-    * Enabling Hooks will call all the frozen hooks that has not been called when it was frozen
+    * enabling Hooks will call all the frozen hooks that has not been called when it was frozen
     */
     enableHooks: () => Promise<void>;
 
@@ -93,8 +93,15 @@ export interface IDatabase<D extends string> {
     watch: <T extends IId<D>>(tableName: D) => IWatcher<T, D>;
     /**
      * Create IQuery object.
+     * @deprecated since version 1.4.3 use querySelector instead
      */
     query: <T extends IId<D>>(tableName: D) => IQuery<T, D>;
+
+    /**
+     * More advanced queryBuilder
+     * It include join and aggregators and better validations
+     */
+    querySelector: <T extends IId<D>>(tabelName: D) => IQuerySelector<T, D>;
     /**
      * execute sql eg
      * query: select * from users where name = ?
@@ -147,6 +154,7 @@ export interface IDatabase<D extends string> {
      * execute an array of sql
      */
     executeRawSql: (queries: SqlLite.Query[], readOnly: boolean) => Promise<void>;
+
 }
 
 ```
