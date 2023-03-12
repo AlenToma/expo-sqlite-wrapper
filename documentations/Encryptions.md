@@ -31,14 +31,14 @@ class User extends IBaseModule<TableNames>{
 ## Searching
 To be able to search those column, you have tow diffrent ways. 
 
-1- Using `IQuery` to search as it will make sure to encrypt your search when it is send to the database
+1- Using `querySelector` to search as it will make sure to encrypt your search when it is send to the database
 
 2- Manually encrypt your search and compare it.
 
 ### example 1
 ```ts
   // 123 will be encrypted so it could be compare to the value in the database
-  var item = await dbContext.database.query<User>("Users").column("password").EqualTo("123").toList();
+  var item = await dbContext.database.querySelector<User>("Users").column(x=> x.password).EqualTo("123").toList();
 
 ```
 
