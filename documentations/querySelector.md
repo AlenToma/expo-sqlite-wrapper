@@ -17,7 +17,7 @@ query.Where.Column(x=> x.id).EqualTo(1);
 query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]);
 
 // You could Select
-query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Columns(x=> [x.a.id, x.b.name]);
+query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Columns((x, as) => [x.a.id, x.b.name, as(x.email, "user email")]);
 
 // you could use sqlite aggrigatos like count, min, max and more
 query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]).Select.Count(x=> x.a.id, "idCount").Count(x=> "*", "AllRows");
