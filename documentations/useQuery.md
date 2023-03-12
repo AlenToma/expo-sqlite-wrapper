@@ -29,7 +29,7 @@ return (
 The TableName
 
 ### query
-Could be one of the folowing `(IQuery<T, D>) | (SQLite.Query) | (() => Promise<T[]>)`
+Could be one of the folowing `(SqlLite.Query) | (IReturnMethods<T, D>) | (() => Promise<T[]>`
 
 The initiated data.
 
