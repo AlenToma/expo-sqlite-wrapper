@@ -155,8 +155,8 @@ export default class QuerySelectorTranslator {
                         {
                             if (value.isInnerSelect) {
                                 if (value.args.indexOf("(") != -1)
-                                    sql.append(value.getInnerSelect(), ")");
-                                else sql.append(value.getInnerSelect());
+                                    sql.append(value.getInnerSelect(value.args), ")");
+                                else sql.append(value.getInnerSelect(value.args));
                             } else {
                                 if (value.args.indexOf("(") != -1)
                                     sql.append(arrValue.map(x => "?").join(", "), ")");

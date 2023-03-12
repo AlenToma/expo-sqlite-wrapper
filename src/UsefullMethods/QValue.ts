@@ -1,6 +1,6 @@
 import Functions from "./Functions";
-import {IDataBaseExtender} from '../expo.sql.wrapper.types'
-import QuerySelector,{Param} from '../QuerySelector'
+import { IDataBaseExtender } from '../expo.sql.wrapper.types'
+import QuerySelector, { Param } from '../QuerySelector'
 export default class QValue {
     value?: any;
     value2?: any;
@@ -109,8 +109,8 @@ export default class QValue {
         return this;
     }
 
-    getInnerSelect(){
+    getInnerSelect(param: Param) {
         let sql = this.value.getInnerSelectSql();
-        return `(${sql})`;
+        return param.indexOf("(") === -1 ? `(${sql})` : `${sql}`;
     }
 }

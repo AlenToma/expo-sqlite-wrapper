@@ -273,7 +273,7 @@ mocha.describe("InnerSelect", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.title).OrderByDesc(x => [x.a.id, x.b.chapterUrl])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
+    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
     console.log("InnerSelect", q.getInnerSelectSql())
 });
 
@@ -293,7 +293,7 @@ mocha.describe("Join", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.title).OrderByDesc(x => [x.a.id, x.b.chapterUrl])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
+    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
     console.log("Join", q.getInnerSelectSql())
 });
 
@@ -314,7 +314,7 @@ mocha.describe("CrossJoin", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.title).OrderByDesc(x => [x.a.id, x.b.chapterUrl])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a CROSS JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
+    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a CROSS JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
     console.log("CrossJoin", q.getInnerSelectSql())
 });
 
@@ -332,7 +332,7 @@ mocha.describe("EmptyJoin", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).OrderByAsc(x => x.a.title).OrderByDesc(x => [x.a.id, x.b.chapterUrl])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a JOIN Chapters as b WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
+    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a JOIN Chapters as b WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) GROUP BY a.id HAVING sName > 4 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
     console.log("EmptyJoin", q.getInnerSelectSql())
 });
 
@@ -352,7 +352,7 @@ mocha.describe("ValueAndBetWeen", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).AND.Column(x => x.a.id).Between(2, 5).OrderByAsc(x => x.a.title).OrderByDesc(x => [x.a.id, x.b.chapterUrl])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
+    sql.trim().should.eql("SELECT a.title as setoNaming , count(b.chapterUrl) as sName FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
     console.log("ValueAndBetWeen", q.getInnerSelectSql())
 });
 
@@ -373,7 +373,7 @@ mocha.describe("Aggrigators", function () {
         .GroupBy(x => x.a.id).Column("sName")
         .GreaterThan(4).AND.Column(x => x.a.id).Between(2, 5).OrderByAsc(x => x.a.title).OrderByDesc(x => [x.a.id, x.b.chapterUrl])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , count(*) as sName , sum(a.id) as s , a.title || \'-\' || a.id as NameAndId FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
+    sql.trim().should.eql("SELECT a.title as setoNaming , count(*) as sName , sum(a.id) as s , a.title || \'-\' || a.id as NameAndId FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) GROUP BY a.id HAVING sName > 4 AND a.id BETWEEN 2 AND 5 ORDER BY a.title ASC, a.id DESC, b.chapterUrl DESC")
     console.log("Aggrigators", q.getInnerSelectSql())
 });
 
@@ -391,7 +391,7 @@ mocha.describe("Union", function () {
         .LessThan(15).AND.Start.Concat("||", x => x.a.title, "-", x => x.a.id).End.EndsWith("1").AND.Column(x => x.a.title).Not.StartsWith("?").AND.Column(x => x.a.novel).Not.IN(q2.Where.Column(x => x.id).GreaterThan(1).Select.Columns(x => [x.novel]))
         .Select.Columns((x, as) => [as(x.a.title, "setoNaming")])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) UNION SELECT chapterUrl FROM Chapters WHERE id > 1 AND chapterUrl NOT like \'#dbEncrypted&JY+5fBsP75gn/K/VA1KFkQ==%\'")
+    sql.trim().should.eql("SELECT a.title as setoNaming FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) UNION SELECT chapterUrl FROM Chapters WHERE id > 1 AND chapterUrl NOT like \'#dbEncrypted&JY+5fBsP75gn/K/VA1KFkQ==%\'")
     console.log("Union", q.getInnerSelectSql())
 });
 
@@ -408,7 +408,7 @@ mocha.describe("UnionAll", function () {
         .LessThan(15).AND.Start.Concat("||", x => x.a.title, "-", x => x.a.id).End.EndsWith("1").AND.Column(x => x.a.title).Not.StartsWith("?").AND.Column(x => x.a.novel).Not.IN(q2.Where.Column(x => x.id).GreaterThan(1).Select.Columns(x => [x.novel]))
         .Select.Columns((x, as) => [as(x.a.title, "setoNaming")])
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) ) UNION ALL SELECT chapterUrl FROM Chapters WHERE id > 1 AND chapterUrl NOT like \'#dbEncrypted&JY+5fBsP75gn/K/VA1KFkQ==%\'")
+    sql.trim().should.eql("SELECT a.title as setoNaming FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 ) UNION ALL SELECT chapterUrl FROM Chapters WHERE id > 1 AND chapterUrl NOT like \'#dbEncrypted&JY+5fBsP75gn/K/VA1KFkQ==%\'")
     console.log("Union", q.getInnerSelectSql())
 });
 
@@ -424,6 +424,6 @@ mocha.describe("Select case", function () {
         .LessThan(15).AND.Start.Concat("||", x => x.a.title, "-", x => x.a.id).End.EndsWith("1").AND.Column(x => x.a.title).Not.StartsWith("?").AND.Column(x => x.a.novel).Not.IN(q2.Where.Column(x => x.id).GreaterThan(1).Select.Columns(x => [x.novel]))
         .Select.Columns((x, as) => [as(x.a.title, "setoNaming")]).Case("test").When.Column(x=> x.a.id).EqualTo(2).Then.Value("hahaha").Else.Value("hohoho").EndCase
         .getInnerSelectSql()
-    sql.trim().should.eql("SELECT a.title as setoNaming , (  CASE WHEN a.id = 2 THEN \'hahaha\' ELSE \'hohoho\' END ) as test FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE CASE WHEN a.id = 2 THEN \'hahaha\' ELSE \'hohoho\' END NOT IN( \'hohoho\' ) AND a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( (SELECT novel FROM DetaliItems WHERE id > 1) )")
+    sql.trim().should.eql("SELECT a.title as setoNaming , (  CASE WHEN a.id = 2 THEN \'hahaha\' ELSE \'hohoho\' END ) as test FROM DetaliItems as a LEFT JOIN Chapters as b ON  a.id = b.detaliItem_Id WHERE CASE WHEN a.id = 2 THEN \'hahaha\' ELSE \'hohoho\' END NOT IN( \'hohoho\' ) AND a.id < 15 AND ( a.title || \'-\' || a.id ) like \'%1\' AND a.title NOT like \'?%\' AND a.novel NOT IN( SELECT novel FROM DetaliItems WHERE id > 1 )")
     console.log("Select case", q.getInnerSelectSql())
 });
