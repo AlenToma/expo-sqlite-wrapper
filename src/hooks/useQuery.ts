@@ -1,11 +1,11 @@
 import { IBaseModule, IDatabase, IDataBaseExtender, IId, IQuery, IQueryResultItem } from "../expo.sql.wrapper.types";
-import { GlobalIQuerySelector } from "../QuerySelector";
+import { IReturnMethods } from "../QuerySelector";
 import { createQueryResultType, Functions } from '../UsefullMethods'
 import * as SQLite from 'expo-sqlite';
 import { useState, useEffect, useRef } from 'react'
 
 const UseQuery = <T extends IId<D>, D extends string>(
-    query: (IQuery<T, D>) | (SQLite.Query) | (GlobalIQuerySelector) | (() => Promise<T[]>),
+    query: (IQuery<T, D>) | (SQLite.Query) | (IReturnMethods<T, D>) | (() => Promise<T[]>),
     dbContext: IDatabase<D>,
     tableName: D,
     onItemChange?: (items: T[]) => T[],

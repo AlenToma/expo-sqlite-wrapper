@@ -1,7 +1,7 @@
 import * as SqlLite from 'expo-sqlite'
 import { TableBuilder } from './TableStructor';
 import BulkSave from './BulkSave';
-import { IQuerySelector } from './QuerySelector';
+import { IReturnMethods, IQuerySelector } from './QuerySelector';
 
 export type ColumnType = 'Number' | 'String' | 'Decimal' | 'Boolean' | "DateTime";
 
@@ -215,7 +215,7 @@ export type IQueryResultItem<T, D extends string> = T & {
 
 
 const OUseQuery = <T extends IId<D>, D extends string>(tableName: D,
-    query: (IQuery<T, D>) | (SqlLite.Query) | (() => Promise<T[]>),
+    query: (IQuery<T, D>) | (SqlLite.Query) | (IReturnMethods<T, D>) | (() => Promise<T[]>),
     onDbItemsChanged?: (items: T[]) => T[]
 ) => ([[] as IQueryResultItem<T, D>[], {} as boolean, new Function() as () => Promise<void>, {} as IDatabase<D>] as const)
 

@@ -8,6 +8,7 @@ export interface DetaliItems {
     parserName: string;
     chapterIndex: number;
     isFavorit?: boolean;
+    children?:Chapters[]
 }
 
 export interface Chapters {

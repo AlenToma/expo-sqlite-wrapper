@@ -140,6 +140,15 @@ mocha.describe("DeleteWithSearchNotIn", function () {
     sql.args.length.should.eql(2)
 });
 
+mocha.describe("DeleteWithEncryptions", function () {
+    console.log("DeleteWithEncryptions");
+    var q = new QuerySelector<DetaliItems, TableNames>("DetaliItems", database) as any as IQuerySelector<DetaliItems, TableNames>;
+    const sql = (q.Where.Start.Column(x => x.image).Not.IN([item.novel]).End.getSql("DELETE"))
+    sql.sql.trim().should.eql("DELETE FROM DetaliItems WHERE ( image NOT IN( ? ) )")
+    sql.args[0].should.eql("#dbEncrypted&0eUCHRbFc8mdr94/KJYKOA==")
+    sql.args.length.should.eql(1)
+});
+
 
 mocha.describe("LimitTest", function () {
     console.log("LimitTest");

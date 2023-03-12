@@ -10,45 +10,13 @@ Installation for `expo-sqlite` read https://docs.expo.dev/versions/latest/sdk/sq
 ## Documentations
 * [Modules Setup](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/SetupModules.md)
 * [DbContext](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/dbContexts.md)
-* [select and save operations](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Select_and_Save.md)
+* [Select and save operations](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Select_and_Save.md)
 * [Watch the db operations](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Watcher.md)
 * [BulkSave](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/BulkSave.md)
 * [Encryptions](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/Encryptions.md)
 * [useQuery](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/useQuery.md)
+* [querySelector](https://github.com/AlenToma/expo-sqlite-wrapper/blob/main/documentations/querySelector.md)
 
-### IQuery
-```js
-export interface IQuery<T, D extends string> {
-    Column: (columnName: NonFunctionPropertyNames<T>) => IQuery<T, D>;
-    EqualTo: (value: SingleValue) => IQuery<T, D>;
-    Contains: (value: StringValue) => IQuery<T, D>;
-    StartWith: (value: StringValue) => IQuery<T, D>;
-    EndWith: (value: StringValue) => IQuery<T, D>;
-    NotEqualTo: (value: SingleValue) => IQuery<T, D>;
-    EqualAndGreaterThen: (value: NumberValue | StringValue) => IQuery<T, D>;
-    EqualAndLessThen: (value: NumberValue | StringValue) => IQuery<T, D>;
-    Start: () => IQuery<T, D>;
-    End: () => IQuery<T, D>;
-    OR: () => IQuery<T, D>;
-    AND: () => IQuery<T, D>;
-    GreaterThan: (value: NumberValue | StringValue) => IQuery<T, D>;
-    LessThan: (value: NumberValue | StringValue) => IQuery<T, D>;
-    IN: (value: ArrayValue) => IQuery<T, D>;
-    NotIn: (value: ArrayValue) => IQuery<T, D>;
-    Null: () => IQuery<T, D>;
-    NotNull: () => IQuery<T, D>;
-    OrderByDesc: (columnName: NonFunctionPropertyNames<T>) => IQuery<T, D>;
-    OrderByAsc: (columnName: NonFunctionPropertyNames<T>) => IQuery<T, D>;
-    Limit: (value: number) => IQuery<T, D>;
-    LoadChildren: <B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) => IChildQueryLoader<B, T, D>;
-    LoadChild: <B>(childTableName: D, parentProperty: NonFunctionPropertyNames<T>) => IChildQueryLoader<B, T, D>
-    delete: () => Promise<void>;
-    firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
-    findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
-    toList: () => Promise<IQueryResultItem<T, D>[]>;
-    getQueryResult: (operation?: "SELECT" | "DELETE") => IQuaryResult<D>;
-}
-```
 
 ### IDatabase
 ```ts

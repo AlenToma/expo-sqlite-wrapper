@@ -10,7 +10,7 @@ export type InnerSelect = { getInnerSelectSql: () => string; }
 export type IUnionSelectorParameter<T extends IId<D>, D extends string> = {
     querySelector: <T extends IId<D>>(tabelName: D) => IQuerySelector<T, D>;
 }
-export type IUnionSelector<T extends IId<D>, D extends string> = (x: IUnionSelectorParameter<T, D>) => GlobalIQuerySelector;
+export type IUnionSelector<T extends IId<D>, D extends string> = (x: IUnionSelectorParameter<T, D>) => GlobalIQuerySelector<T, D>;
 
 export type R<T, S extends string> = Record<S, T>;
 
@@ -73,7 +73,7 @@ export declare type ArrayValue = any[] | undefined;
 export declare type NumberValue = number | undefined;
 export declare type StringValue = string | undefined;
 
-export type GlobalIQuerySelector = {
+export type GlobalIQuerySelector<T, D extends string> = {
     /**
      * get the translated sql
      */
@@ -82,7 +82,7 @@ export type GlobalIQuerySelector = {
     getInnerSelectSql: () => string;
 }
 
-export interface IReturnMethods<T, D extends string> extends GlobalIQuerySelector {
+export interface IReturnMethods<T, D extends string> extends GlobalIQuerySelector<T, D> {
     firstOrDefault: () => Promise<IQueryResultItem<T, D> | undefined>;
     toList: () => Promise<IQueryResultItem<T, D>[]>;
     findOrSave: (item: T & IBaseModule<D>) => Promise<IQueryResultItem<T, D>>;
@@ -225,6 +225,11 @@ export interface GenericQuery<T, ParentType, D extends string, ReturnType> exten
     * end case, work with case
     */
     EndCase: GenericQueryWithValue<ReturnType> & ReturnType;
+    /**
+    * Load Child or children
+    */
+    LoadChildren: <B extends IId<D>>(child: D, childColumn: NonFunctionPropertyNames<B>, parentColumn: NonFunctionPropertyNames<ParentType>, assignTo: NonFunctionPropertyNames<ParentType>, isArray?: boolean) => ReturnType;
+
 
 }
 
@@ -328,12 +333,8 @@ export interface IQuerySelector<T, D extends string> extends IReturnMethods<T, D
      */
     UnionAll: <B extends IId<D>>(...queryselectors: IUnionSelector<B, D>[]) => IQuerySelector<T, D>
     /**
-    * right join a table
-    * eg RightJoin<TableB, "b">("TableB", "b").Column(x=> x.a.id).EqualTo(x=> x.b.parentId)...
-    * This will overwrite the above where, so use the Where that is returned by RightJoin method instead
-    * sqlite dose not currently support this
-    */
-    //RightJoin: <B, S extends string>(tableName: D, alias: S) => JoinOn<R<T, 'a'> & R<B, S>, T, D>;
+     * Load Child or children
+     */
     LoadChildren: <B extends IId<D>>(child: D, childColumn: NonFunctionPropertyNames<B>, parentColumn: NonFunctionPropertyNames<T>, assignTo: NonFunctionPropertyNames<T>, isArray?: boolean) => IQuerySelector<T, D>;
     Select: IQueryColumnSelector<T, T, D>;
 };
@@ -533,6 +534,18 @@ export class Where<T, ParentType extends IId<D>, D extends string> extends Retur
         this.Queries = queries.map((x: any) => x.type != "QValue" ? QValue.Q.Args(x) : x);
         this.tableName = tableName;
         this.alias = alias;
+    }
+
+    LoadChildren<B extends IId<D>>(child: D, childColumn: NonFunctionPropertyNames<B>, parentColumn: NonFunctionPropertyNames<ParentType>, assignTo: NonFunctionPropertyNames<ParentType>, isArray?: boolean) {
+        this.parent.children.push({
+            parentProperty: parentColumn as string,
+            parentTable: this.parent.tableName,
+            childProperty: childColumn as string,
+            childTableName: child,
+            assignTo: assignTo as string,
+            isArray: isArray ?? false
+        });
+        return this;
     }
 
     get Case() {
@@ -839,7 +852,7 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
     where?: Where<any, any, D>;
     having?: Where<any, any, D>;
     joins: Where<any, any, D>[];
-    unions: { type: Param.Union | Param.UnionAll, value: GlobalIQuerySelector }[];
+    unions: { type: Param.Union | Param.UnionAll, value: GlobalIQuerySelector<T, D> }[];
     tableName: D;
     alias: string;
     queryColumnSelector?: QueryColumnSelector<any, any, D>;
@@ -966,7 +979,7 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
         return join;
     }
 
-    LoadChildren<B extends IId<D>>(child: D, childColumn: NonFunctionPropertyNames<B>, parentColumn: NonFunctionPropertyNames<T>, assignTo: NonFunctionPropertyNames<B>, isArray?: boolean) {
+    LoadChildren<B extends IId<D>>(child: D, childColumn: NonFunctionPropertyNames<B>, parentColumn: NonFunctionPropertyNames<T>, assignTo: NonFunctionPropertyNames<T>, isArray?: boolean) {
         this.children.push({
             parentProperty: parentColumn as string,
             parentTable: this.tableName,
@@ -993,12 +1006,16 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
 
         }
         (dbItem as any).tableName = this.tableName;
+        if (dbItem && this.converter)
+            dbItem = this.converter(dbItem);
         return await createQueryResultType<T, D>(dbItem, this.database, this.children);
     }
 
     async firstOrDefault() {
         var item = this.getSql("SELECT");
-        const tItem = Functions.single<any>(await this.database.find(item.sql, item.args, this.tableName))
+        let tItem = Functions.single<any>(await this.database.find(item.sql, item.args, this.tableName))
+        if (tItem && this.converter)
+            tItem = this.converter(tItem);
         return tItem ? await createQueryResultType<T, D>(tItem, this.database, this.children) : undefined;
     }
 
@@ -1007,6 +1024,8 @@ export default class QuerySelector<T extends IId<D>, D extends string> {
         var result = [] as IQueryResultItem<T, D>[];
         for (var x of await this.database.find(sql.sql, sql.args, this.tableName)) {
             x.tableName = this.tableName;
+            if (this.converter)
+                x = this.converter(x);
             result.push(await createQueryResultType<T, D>(x, this.database, this.children));
         }
         return result;
