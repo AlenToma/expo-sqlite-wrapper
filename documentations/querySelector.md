@@ -13,7 +13,7 @@ query.LoadChildren<Child>("Childrens", "parentId", "id", "children", true);
 // Simple Where
 query.Where.Column(x=> x.id).EqualTo(1);
 
-// you could join, left join, crossjoin , innerJoin and join
+// you could join, left join, crossjoin and innerJoin
 query.Join<Child, "b">("Children").Column(x=> x.a.id).EqualTo(x=> x.b.parentId).Where.Column(x=> x.b.name).Not.IN(["test", "test"]);
 
 // You could Select
