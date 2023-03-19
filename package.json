@@ -22,7 +22,7 @@
     "orm",
     "react-native",
     "expo",
-    "expo-sqlite-qrapper"
+    "expo-sqlite-wrapper"
   ],
   "repository": "https://github.com/AlenToma/expo-sqlite-wrapper",
   "author": "Alen Toma <alen.toma@gmail.com> (https://github.com/AlenToma)",
